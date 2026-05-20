@@ -15,7 +15,7 @@ from services.memory_service import (
     save_message
 )
 from dotenv import load_dotenv
-
+import traceback
 import os
 import json
 
@@ -139,10 +139,5 @@ async def receive_message(request: Request):
         return {"status": "ok"}
 
     except Exception as e:
-
         print("\nWEBHOOK ERROR:\n")
-        print(str(e))
-
-        return {
-            "error": str(e)
-        }
+        traceback.print_exc()
