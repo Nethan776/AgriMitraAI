@@ -90,10 +90,12 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="nemotron-3-super-120b-a12b:free",  # Best free model for Gujarati — 140+ languages
+        model="meta-llama/llama-3.3-70b-instruct:free",  # Best free model for Gujarati — 140+ languages
         messages=messages,
         temperature=0.3,   # Low = consistent, less hallucination
         max_tokens=400,
     )
 
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+
+    return response.choices[0].message.content
