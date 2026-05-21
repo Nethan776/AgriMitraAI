@@ -52,23 +52,21 @@ SYSTEM_PROMPT = """
 
 def build_system_prompt(farmer: dict = None) -> str:
     prompt = SYSTEM_PROMPT
-
+ 
     if farmer:
-        name    = farmer.get("name")    or "અજ્ઞાત"
+        name    = farmer.get("name")    or "ખેડૂત"
         village = farmer.get("village") or "અજ્ઞાત"
-        crops   = farmer.get("crops")   or []
-
-        crop_text = "、".join(crops) if crops else "અજ્ઞાત"
-
+        taluka  = farmer.get("taluka")  or "અજ્ઞાત"
+ 
         farmer_block = f"""
 ━━━ ખેડૂત માહિતી ━━━
 • નામ: {name}
 • ગામ: {village}
-• પાક: {crop_text}
-આ ખેડૂત સાથે વ્યક્તિગત રીતે વાત કરો અને તેમની પરિસ્થિતિ ધ્યાનમાં રાખો.
+• તાલુકો: {taluka}
+આ ખેડૂત સાથે વ્યક્તિગત અને આત્મીય રીતે વાત કરો.
 """
         prompt += farmer_block
-
+ 
     return prompt
 
 
