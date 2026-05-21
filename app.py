@@ -123,9 +123,10 @@ async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str
 
         name = farmer.get("name", "ખેડૂત")
         welcome = (
-            f"આવકારો, {name}ભાઈ! 🌾\n\n"
-            "હું કૃષિ મિત્ર છું — તમારો AI ખેતી સહાયક.\n\n"
-            "હવે તમારી ખેતી સમસ્યા જણાવો — હું મદદ કરીશ! 🙏"
+            f"નમસ્તે આગ્રિમિત્રમાં તમારું સ્વાગત છે, {name}ભાઈ!\n\n"
+            "હવે તમે પાક, જીવાત, રોગ, ખાતર, સિંચાઈ અથવા બજારભાવ સંબંધિત કોઈપણ પ્રશ્ન પૂછી શકો છો.\n\n"
+            "તમે ફોટો પણ મોકલી શકો છો 📷"
+            "તમારી ખેતીમાં મદદ માટે અમે હંમેશા તૈયાર છીએ 🌱"
         )
         save_message(farmer["id"], "assistant", welcome)
         await send_whatsapp_reply(phone, welcome)
