@@ -118,16 +118,13 @@ async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str
         })
         save_message(farmer["id"], "user", text, whatsapp_message_id=message_id)
 
-        # Fetch updated farmer so we have full name for the welcome message
-        from services.memory_service import get_or_create_farmer as refresh
-        farmer, _ = refresh(phone)
+        # farmer dict already has the name — no need to re-fetch
         name = farmer.get("name", "ખેડૂત")
 
         welcome = (
-            f"નમસ્તે, તમારું સ્વાગત છે, {name}ભાઈ!🌾\n\n"
-            "હવે તમે પાક, જીવાત, રોગ, ખાતર, સિંચાઈ અથવા બજારભાવ સંબંધિત કોઈપણ પ્રશ્ન પૂછી શકો છો.\n\n"
-            "તમે ફોટો પણ મોકલી શકો છો 📷"
-            "તમારી ખેતીમાં મદદ માટે અમે હંમેશા તૈયાર છીએ 🌱"
+            f"આવकारो, {name}ભાઈ! 🌾\n\n"
+            "હું કૃષિ મિત્ર છું — તમારો AI ખેતી સહાયક.\n\n"
+            "હવે તમારી ખેતી સમસ્યા જણાવો — હું મદદ કરીશ! 🙏"
         )
         save_message(farmer["id"], "assistant", welcome)
         await send_whatsapp_reply(phone, welcome)
