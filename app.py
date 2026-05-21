@@ -78,39 +78,42 @@ async def verify_webhook(
 
 # ─────────────────────────────────────────────
 # Onboarding Handler
-# Collects name → village → taluka step by step
+# Returns True if onboarding just completed this message
+# Returns False if still in progress
 # ─────────────────────────────────────────────
 
-async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str):
+async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str) -> bool:
     """
-    Walks a new farmer through setup before they can use the assistant.
-    Uses onboarding_step column to track progress:
-      ask_name → ask_village → ask_taluka → done
+    Handles one onboarding step per call.
+    Returns True if onboarding just finished (taluka step done).
+    Returns False if still collecting details.
     """
     step = farmer.get("onboarding_step", "ask_name")
     text = text.strip()
 
-    # ── Step 1: We asked for name, they just replied ──
+    # ── Step 1: received name, ask village ──
     if step == "ask_name":
         update_farmer_details(farmer["id"], {
             "name":            text,
             "onboarding_step": "ask_village"
         })
-        save_message(farmer["id"], "user",      text,          whatsapp_message_id=message_id)
+        save_message(farmer["id"], "user",      text, whatsapp_message_id=message_id)
         save_message(farmer["id"], "assistant", "તમારું ગામ કયું છે?")
         await send_whatsapp_reply(phone, "તમારું ગામ કયું છે?")
+        return False
 
-    # ── Step 2: We asked for village, they just replied ──
+    # ── Step 2: received village, ask taluka ──
     elif step == "ask_village":
         update_farmer_details(farmer["id"], {
             "village":         text,
             "onboarding_step": "ask_taluka"
         })
-        save_message(farmer["id"], "user",      text,           whatsapp_message_id=message_id)
+        save_message(farmer["id"], "user",      text, whatsapp_message_id=message_id)
         save_message(farmer["id"], "assistant", "તમારો તાલુકો કયો છે?")
         await send_whatsapp_reply(phone, "તમારો તાલુકો કયો છે?")
+        return False
 
-    # ── Step 3: We asked for taluka, they just replied ──
+    # ── Step 3: received taluka — onboarding complete ──
     elif step == "ask_taluka":
         update_farmer_details(farmer["id"], {
             "taluka":          text,
@@ -118,16 +121,17 @@ async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str
         })
         save_message(farmer["id"], "user", text, whatsapp_message_id=message_id)
 
-        # farmer dict already has the name — no need to re-fetch
         name = farmer.get("name", "ખેડૂત")
-
         welcome = (
-            f"આવकारो, {name}ભાઈ! 🌾\n\n"
+            f"આવકારો, {name}ભાઈ! 🌾\n\n"
             "હું કૃષિ મિત્ર છું — તમારો AI ખેતી સહાયક.\n\n"
             "હવે તમારી ખેતી સમસ્યા જણાવો — હું મદદ કરીશ! 🙏"
         )
         save_message(farmer["id"], "assistant", welcome)
         await send_whatsapp_reply(phone, welcome)
+        return True   # ← onboarding just finished, do NOT run AI after this
+
+    return False
 
 
 # ─────────────────────────────────────────────
@@ -165,7 +169,7 @@ async def receive_message(request: Request):
         farmer, is_new = get_or_create_farmer(phone)
         update_last_active(farmer["id"])
 
-        # ── NEW FARMER — start onboarding ─────────────────────────────────
+        # ── BRAND NEW FARMER — send greeting, ask for name ────────────────
         if is_new:
             save_message(farmer["id"], "user", text or "(media)", whatsapp_message_id=message_id)
             greeting = (
@@ -179,12 +183,14 @@ async def receive_message(request: Request):
 
         # ── ONBOARDING IN PROGRESS ────────────────────────────────────────
         if not is_onboarding_complete(farmer):
-            await handle_onboarding(farmer, text, phone, message_id)
+            just_finished = await handle_onboarding(farmer, text, phone, message_id)
+            # Whether still in progress or just finished — stop here.
+            # Never fall through to AI during or right after onboarding.
             return {"status": "ok"}
 
-        # ── NORMAL FLOW — onboarding done, handle message ─────────────────
+        # ── NORMAL FLOW — onboarding done ─────────────────────────────────
 
-        # Handle image
+        # Handle image with no caption
         if msg_type == "image":
             if not text:
                 await send_whatsapp_reply(
@@ -224,7 +230,7 @@ async def receive_message(request: Request):
             )
             return {"status": "ok"}
 
-        # ── LOAD HISTORY + GENERATE RESPONSE ─────────────────────────────
+        # ── LOAD HISTORY + GENERATE AI RESPONSE ──────────────────────────
         history = get_recent_messages(farmer["id"], limit=5)
 
         reply = generate_ai_response(
@@ -250,11 +256,6 @@ async def receive_message(request: Request):
 # ─────────────────────────────────────────────
 
 def transcribe_audio(audio_bytes: bytes) -> str | None:
-    """
-    Transcribe a Gujarati voice note using Groq's Whisper API.
-    Free, fast, no ffmpeg needed, works on Render.
-    Requires: GROQ_API_KEY in environment variables.
-    """
     try:
         from groq import Groq
         import tempfile
