@@ -123,10 +123,9 @@ async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str
 
         name = farmer.get("name", "ખેડૂત")
         welcome = (
-            f"નમસ્તે આગ્રિમિત્રમાં તમારું સ્વાગત છે, {name}ભાઈ!\n\n"
-            "હવે તમે પાક, જીવાત, રોગ, ખાતર, સિંચાઈ અથવા બજારભાવ સંબંધિત કોઈપણ પ્રશ્ન પૂછી શકો છો.\n\n"
-            "તમે ફોટો પણ મોકલી શકો છો 📷"
-            "તમારી ખેતીમાં મદદ માટે અમે હંમેશા તૈયાર છીએ 🌱"
+            f"આવકારો, {name}ભાઈ! 🌾\n\n"
+            "હું કૃષિ મિત્ર છું — તમારો AI ખેતી સહાયક.\n\n"
+            "હવે તમારી ખેતી સમસ્યા જણાવો — હું મદદ કરીશ! 🙏"
         )
         save_message(farmer["id"], "assistant", welcome)
         await send_whatsapp_reply(phone, welcome)
@@ -159,16 +158,18 @@ async def receive_message(request: Request):
         media_id   = parsed["media_id"]
         message_id = parsed["message_id"]
 
-        # ── DEDUPLICATION ─────────────────────────────────────────────────
-        if is_duplicate_message(message_id):
-            print(f"⚠️  Duplicate ignored: {message_id}")
-            return {"status": "ok"}
-
         print(f"\n📩 [{msg_type}] from {phone}: {text or '(media)'}")
 
         # ── GET OR CREATE FARMER ──────────────────────────────────────────
+        # Must load farmer first so deduplication is scoped per farmer.
+        # Two different farmers can have the same WhatsApp message ID.
         farmer, is_new = get_or_create_farmer(phone)
         update_last_active(farmer["id"])
+
+        # ── DEDUPLICATION (per farmer) ────────────────────────────────────
+        if is_duplicate_message(farmer["id"], message_id):
+            print(f"⚠️  Duplicate ignored: {message_id}")
+            return {"status": "ok"}
 
         # ── BRAND NEW FARMER — send greeting, ask for name ────────────────
         if is_new:
