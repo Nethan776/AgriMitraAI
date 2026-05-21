@@ -90,7 +90,7 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="meta-llama/llama-3.3-70b-instruct:free",  # Best free model for Gujarati — 140+ languages
+        model="openai/gpt-oss-120b:free",  # Best free model for Gujarati — 140+ languages
         messages=messages,
         temperature=0.3,   # Low = consistent, less hallucination
         max_tokens=400,

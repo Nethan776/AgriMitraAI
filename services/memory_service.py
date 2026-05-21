@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 # Farmer
 # ─────────────────────────────────────────────
 
-def get_or_create_farmer(phone: str) -> dict:
+def get_or_create_farmer(phone: str) -> tuple[dict, bool]:
     """
     Look up farmer by WhatsApp number.
-    Creates a new bare profile if this is their first message.
+    Returns (farmer_dict, is_new) so the caller knows if this is
+    their first message and needs to collect their details.
     """
     result = supabase.table("farmers") \
         .select("*") \
@@ -17,15 +18,26 @@ def get_or_create_farmer(phone: str) -> dict:
         .execute()
 
     if result.data:
-        return result.data[0]
+        return result.data[0], False
 
-    # First time this farmer messages — create profile
+    # First time — create bare profile with just phone number
     inserted = supabase.table("farmers") \
-        .insert({"whatsapp_number": phone}) \
+        .insert({
+            "whatsapp_number": phone,
+            "onboarding_step": "ask_name"   # tracks where they are in setup
+        }) \
         .execute()
 
     print(f"🌱 New farmer registered: {phone}")
-    return inserted.data[0]
+    return inserted.data[0], True
+
+
+def update_farmer_details(farmer_id: str, fields: dict):
+    """Update any farmer profile fields."""
+    supabase.table("farmers") \
+        .update(fields) \
+        .eq("id", farmer_id) \
+        .execute()
 
 
 def update_last_active(farmer_id: str):
@@ -36,6 +48,11 @@ def update_last_active(farmer_id: str):
         .execute()
 
 
+def is_onboarding_complete(farmer: dict) -> bool:
+    """Returns True if we have all the basic details we need."""
+    return bool(farmer.get("name") and farmer.get("village"))
+
+
 # ─────────────────────────────────────────────
 # Messages — with deduplication
 # ─────────────────────────────────────────────
@@ -43,10 +60,8 @@ def update_last_active(farmer_id: str):
 def is_duplicate_message(whatsapp_message_id: str) -> bool:
     """
     Check if we've already processed this WhatsApp message ID.
-
-    WhatsApp retries webhook delivery if it doesn't get a fast 200 OK.
-    This causes the same message to arrive 2-3 times.
-    We block duplicates using the unique whatsapp_message_id field.
+    WhatsApp retries webhooks if it doesn't get a fast 200 OK,
+    causing the same message to arrive 2-3 times.
     """
     if not whatsapp_message_id:
         return False
@@ -60,17 +75,13 @@ def is_duplicate_message(whatsapp_message_id: str) -> bool:
 
 
 def save_message(farmer_id: str, role: str, content: str, whatsapp_message_id: str = None):
-    """
-    Save a message to the database.
-    Pass whatsapp_message_id for user messages so we can deduplicate future retries.
-    """
+    """Save a message (user or assistant) to the database."""
     row = {
         "farmer_id": farmer_id,
         "role":      role,
         "content":   content,
     }
 
-    # Only store message_id for user messages (assistant messages have no WA ID)
     if whatsapp_message_id:
         row["whatsapp_message_id"] = whatsapp_message_id
 
@@ -92,10 +103,7 @@ def get_recent_messages(farmer_id: str, limit: int = 5) -> list:
         .limit(limit) \
         .execute()
 
-    # Reverse so oldest message is first (correct order for AI context)
     return [
         {"role": msg["role"], "content": msg["content"]}
         for msg in reversed(result.data)
     ]
-
-
