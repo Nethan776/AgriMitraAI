@@ -49,8 +49,8 @@ def update_last_active(farmer_id: str):
 
 
 def is_onboarding_complete(farmer: dict) -> bool:
-    """Returns True if we have all the basic details we need."""
-    return bool(farmer.get("name") and farmer.get("village"))
+    """Returns True only when all onboarding steps are fully done."""
+    return farmer.get("onboarding_step") == "done"
 
 
 # ─────────────────────────────────────────────
