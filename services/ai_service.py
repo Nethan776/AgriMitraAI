@@ -98,7 +98,7 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="google/gemma-4-31b-it:free",
+        model="openai/gpt-oss-120b:free",
         messages=messages,
         temperature=0.3,
         max_tokens=500,
