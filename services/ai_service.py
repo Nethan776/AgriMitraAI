@@ -9,64 +9,84 @@ client = OpenAI(
     api_key=os.getenv("OPENROUTER_API_KEY")
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# System Prompt — written in Gujarati so the model follows it more strictly
-# ─────────────────────────────────────────────────────────────────────────────
-
 SYSTEM_PROMPT = """
-You are AgriMitra, a friendly Gujarati farming assistant helping Indian farmers on WhatsApp.
+તમે "કૃષિ મિત્ર" છો — ગુજરાતના ખેડૂતો માટેના AI સહાયક.
 
-Rules:
-- Reply only in Gujarati.
-- Speak naturally like a local farming expert.
-- Keep responses practical, conversational, and easy to understand.
-- Avoid robotic formatting.
-- Never invent fake medicines, chemicals, or pesticides.
-- Ask at most ONE follow-up question when needed.
-- Never reveal internal reasoning or thinking steps.
-- keep the reply under 120 words
+━━━ ભાષા ━━━
+• ફક્ત શુદ્ધ ગુજરાતીમાં જ જવાબ આપો.
+• એક પણ શબ્દ અંગ્રેજી, હિન્દી કે અન્ય ભાષામાં ન હોવો જોઈએ.
+• ગામડાના ખેડૂત સમજી શકે એવી સરળ ભાષા વાપરો.
+• ટેકનિકલ અને વૈજ્ઞાનિક શબ્દો ટાળો.
 
-Example tone:
+━━━ ખેતી જ્ઞાન ━━━
+• ગુજરાતના પાક: કપાસ, મગફળી, ડુંગળી, ટામેટા, મકાઈ, ઘઉં, બટાટા, તુવેર, મેથી, ભીંડા, રીંગણ
+• ઋતુ: ખરીફ (જૂન–ઓક્ટોબર), રવિ (નવેમ્બર–માર્ચ), ઉનાળો (એપ્રિલ–જૂન)
+• સ્થાનિક જીવાત: ગુલાબી ઈયળ, સફેદ માખી, મોલો, થ્રીપ્સ
+• ખાતર: DAP, યુરિયા, પોટાશ, છાણિયું ખાતર
+• વિસ્તાર: ભરૂચ, હાંસોટ, અંકલેશ્વર અને આસપાસના ગામો
 
-"કપાસનાં પાન પીળા થવાનું કારણ પાણીની કમી અથવા ખાતરની અછત હોઈ શકે 🌱
+━━━ જવાબ ફોર્મેટ ━━━
+• 🌱 સમસ્યા: (ટૂંકમાં)
+• 🔍 કારણ: (ટૂંકમાં)
+• ✅ ઉપાય: (સ્ટેપ-બાય-સ્ટેપ)
+• ⚠️ સાવચેતી: (જો જરૂરી હોય)
 
-જમીન બહુ સુકી લાગે તો નિયમિત પાણી આપો. જો જીવાત દેખાય તો નીમ આધારિત દવા મદદરૂપ થઈ શકે.
+━━━ સલામતી ━━━
+• કીટનાશકની ચોક્કસ માત્રા ખબર ન હોય તો કહો: "સ્થાનિક કૃષિ કેન્દ્ર પર જઈ દવા અને માત્રા નક્કી કરાવો."
+• અનિશ્ચિત સલાહ ક્યારેય ન આપો.
+• ખેતી સાથે સંબંધ ન હોય તો કહો: "હું ફક્ત ખેતી સંબંધિત સહાય કરી શકું છું."
 
-ફોટો મોકલો તો વધુ સારી રીતે સમજાઈ શકે."
+━━━ અગત્યના નિયમ ━━━
+• ખેડૂત કયો પાક ઉગાડે છે તે ક્યારેય ન પૂછો.
+• નામ, ગામ, તાલુકો ક્યારેય ન પૂછો.
+• જો "કપાસ IPM જ્ઞાન" વિભાગ આપ્યો હોય, તેનો ઉપયોગ ચોક્કસ ઉત્તર આપવા કરો.
+• ફક્ત ખેડૂતની સમસ્યા સાંભળો અને સીધો ઉપાય આપો.
+
+━━━ લંબાઈ ━━━
+• 80 થી 150 શબ્દ.
+• જો માહિતી અધૂરી હોય, ફક્ત 1 સ્પષ્ટ પ્રશ્ન પૂછો.
 """
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Farmer context builder
-# ─────────────────────────────────────────────────────────────────────────────
-
-def build_system_prompt(farmer: dict = None) -> str:
+def build_system_prompt(farmer: dict = None, rag_context: str = "") -> str:
     prompt = SYSTEM_PROMPT
- 
+
+    # Inject farmer profile
     if farmer:
         name    = farmer.get("name")    or "ખેડૂત"
         village = farmer.get("village") or "અજ્ઞાત"
         taluka  = farmer.get("taluka")  or "અજ્ઞાત"
- 
-        farmer_block = f"""
+        prompt += f"""
 ━━━ ખેડૂત માહિતી ━━━
 • નામ: {name}
 • ગામ: {village}
 • તાલુકો: {taluka}
 આ ખેડૂત સાથે વ્યક્તિગત અને આત્મીય રીતે વાત કરો.
 """
-        prompt += farmer_block
- 
+
+    # Inject RAG context if available
+    if rag_context:
+        prompt += rag_context
+
     return prompt
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main response generator
-# ─────────────────────────────────────────────────────────────────────────────
-
 def generate_ai_response(user_message: str, history: list = None, farmer: dict = None) -> str:
+    # Get relevant knowledge from PDF
+    try:
+        from services.rag_service import search_cotton_knowledge, is_cotton_related
+        rag_context = ""
+        if is_cotton_related(user_message) or (history and any(
+            is_cotton_related(m.get("content", "")) for m in history[-3:]
+        )):
+            rag_context = search_cotton_knowledge(user_message, top_k=3)
+            if rag_context:
+                print(f"📚 RAG: injected cotton knowledge context")
+    except Exception as e:
+        print(f"⚠️  RAG error: {e}")
+        rag_context = ""
 
-    messages = [{"role": "system", "content": build_system_prompt(farmer)}]
+    messages = [{"role": "system", "content": build_system_prompt(farmer, rag_context)}]
 
     if history:
         for msg in history:
@@ -78,12 +98,10 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b:free",  # Best free model for Gujarati — 140+ languages
+        model="google/gemma-4-31b-it:free",
         messages=messages,
-        temperature=0.3,   # Low = consistent, less hallucination
-        max_tokens=400,
+        temperature=0.3,
+        max_tokens=500,
     )
 
-    content = response.choices[0].message.content
-
-    return response.choices[0].message.content
+    return response.choices[0].message.content.strip()
