@@ -58,6 +58,47 @@ def parse_incoming_message(body: dict) -> dict | None:
         return None
 
 
+
+async def mark_as_read(message_id: str):
+    """
+    Marks the farmer's message as read (double blue tick).
+    Call this immediately when a message arrives.
+    """
+    url = f"https://graph.facebook.com/v19.0/{os.getenv('WHATSAPP_PHONE_ID')}/messages"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('WHATSAPP_TOKEN')}",
+        "Content-Type":  "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "status":            "read",
+        "message_id":        message_id
+    }
+    async with httpx.AsyncClient() as client:
+        await client.post(url, json=payload, headers=headers)
+
+
+async def send_typing(phone: str):
+    """
+    Shows the typing... indicator in the farmer's chat for ~25 seconds.
+    Call this right before the AI generates a response.
+    """
+    url = f"https://graph.facebook.com/v19.0/{os.getenv('WHATSAPP_PHONE_ID')}/messages"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('WHATSAPP_TOKEN')}",
+        "Content-Type":  "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type":    "individual",
+        "to":                phone,
+        "type":              "reaction",
+        "typing":            {"status": "typing"}
+    }
+    async with httpx.AsyncClient() as client:
+        await client.post(url, json=payload, headers=headers)
+
+
 async def send_whatsapp_reply(phone: str, message: str):
     """Send a plain text reply to a farmer on WhatsApp."""
 

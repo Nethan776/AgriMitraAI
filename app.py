@@ -8,6 +8,8 @@ from services.ai_service import generate_ai_response
 from services.whatsapp_service import (
     parse_incoming_message,
     send_whatsapp_reply,
+    send_typing,
+    mark_as_read,
     download_whatsapp_media
 )
 from services.memory_service import (
@@ -171,6 +173,9 @@ async def receive_message(request: Request):
             print(f"⚠️  Duplicate ignored: {message_id}")
             return {"status": "ok"}
 
+        # ── MARK AS READ (blue ticks) ─────────────────────────────────────
+        await mark_as_read(message_id)
+
         # ── BRAND NEW FARMER — send greeting, ask for name ────────────────
         if is_new:
             save_message(farmer["id"], "user", text or "(media)", whatsapp_message_id=message_id)
@@ -234,6 +239,9 @@ async def receive_message(request: Request):
 
         # ── LOAD HISTORY + GENERATE AI RESPONSE ──────────────────────────
         history = get_recent_messages(farmer["id"], limit=5)
+
+        # Show typing indicator while AI is thinking
+        await send_typing(phone)
 
         reply = generate_ai_response(
             user_message=text,
