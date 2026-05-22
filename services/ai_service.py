@@ -74,14 +74,8 @@ def build_system_prompt(farmer: dict = None, rag_context: str = "") -> str:
 def generate_ai_response(user_message: str, history: list = None, farmer: dict = None) -> str:
     # Get relevant knowledge from PDF
     try:
-        from services.rag_service import search_cotton_knowledge, is_cotton_related
-        rag_context = ""
-        if is_cotton_related(user_message) or (history and any(
-            is_cotton_related(m.get("content", "")) for m in history[-3:]
-        )):
-            rag_context = search_cotton_knowledge(user_message, top_k=3)
-            if rag_context:
-                print(f"📚 RAG: injected cotton knowledge context")
+        from services.rag_service import get_rag_context
+        rag_context = get_rag_context(user_message, history)
     except Exception as e:
         print(f"⚠️  RAG error: {e}")
         rag_context = ""
@@ -98,7 +92,7 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b:free",
+        model="google/gemma-4-31b-it:free",
         messages=messages,
         temperature=0.3,
         max_tokens=500,
