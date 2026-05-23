@@ -9,3 +9,5 @@ pypdf
 pdfplumber
 scikit-learn
 numpy
+bs4
+beautifulsoup4
