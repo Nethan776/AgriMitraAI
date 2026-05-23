@@ -1,240 +1,198 @@
 import httpx
 import os
 from datetime import date, timedelta
-from bs4 import BeautifulSoup
+
+# ─────────────────────────────────────────────
+# data.gov.in Agmarknet API
+# Free — register at: https://data.gov.in/user/register
+# Get API key → My Account → API Keys
+# Add to Render env: DATA_GOV_API_KEY=your_key
+# Resource ID: 9ef84268-d588-465a-a308-a864a43d0070
+# ─────────────────────────────────────────────
+
+DATA_GOV_URL    = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
+DATA_GOV_API_KEY = os.getenv("DATA_GOV_API_KEY", "")
 
 # ─────────────────────────────────────────────
 # Commodity name mapping
-# Gujarati/common name → Agmarknet exact name
+# Gujarati/common → Agmarknet exact name
 # ─────────────────────────────────────────────
 
 COMMODITY_MAP = {
-    # Cotton
-    "કપાસ":        "Kapas(Cotton Seed with Fibre)",
-    "kapas":        "Kapas(Cotton Seed with Fibre)",
-    "cotton":       "Kapas(Cotton Seed with Fibre)",
-    "કોટન":        "Kapas(Cotton Seed with Fibre)",
+    "કપાસ":     "Cotton",
+    "kapas":     "Cotton",
+    "cotton":    "Cotton",
+    "કોટન":     "Cotton",
 
-    # Groundnut
-    "મગફળી":       "Groundnut",
-    "groundnut":    "Groundnut",
-    "peanut":       "Groundnut",
+    "મગફળી":    "Groundnut",
+    "mungfali":  "Groundnut",
+    "groundnut": "Groundnut",
+    "peanut":    "Groundnut",
 
-    # Onion
-    "ડુંગળી":      "Onion",
-    "dungali":      "Onion",
-    "onion":        "Onion",
-    "dungli":       "Onion",
+    "ડુંગળી":   "Onion",
+    "dungali":   "Onion",
+    "dungali":   "Onion",
+    "onion":     "Onion",
 
-    # Potato
-    "બટાટા":       "Potato",
-    "batata":       "Potato",
-    "potato":       "Potato",
+    "બટાટા":    "Potato",
+    "batata":    "Potato",
+    "potato":    "Potato",
 
-    # Tomato
-    "ટામેટા":      "Tomato",
-    "tameta":       "Tomato",
-    "tomato":       "Tomato",
+    "ટામેટા":   "Tomato",
+    "tameta":    "Tomato",
+    "tomato":    "Tomato",
 
-    # Wheat
-    "ઘઉં":         "Wheat",
-    "gahu":         "Wheat",
-    "wheat":        "Wheat",
+    "ઘઉં":      "Wheat",
+    "gahu":      "Wheat",
+    "wheat":     "Wheat",
 
-    # Maize
-    "મકાઈ":        "Maize",
-    "makai":        "Maize",
-    "maize":        "Maize",
-    "corn":         "Maize",
+    "મકાઈ":     "Maize",
+    "makai":     "Maize",
+    "maize":     "Maize",
 
-    # Tuvar (Pigeon pea)
-    "તુવેર":       "Tur",
-    "tuver":        "Tur",
-    "tur":          "Tur",
-    "arhar":        "Tur",
+    "તુવેર":    "Tur",
+    "tuver":     "Tur",
+    "tur":       "Tur",
 
-    # Castor
-    "દિવેલા":      "Castor Seed",
-    "divela":       "Castor Seed",
-    "castor":       "Castor Seed",
+    "જીરું":    "Cummin Seed(Jeera)",
+    "jeera":     "Cummin Seed(Jeera)",
+    "jiru":      "Cummin Seed(Jeera)",
 
-    # Cumin
-    "જીરું":       "Cummin Seed(Jeera)",
-    "jeera":        "Cummin Seed(Jeera)",
-    "jiru":         "Cummin Seed(Jeera)",
-    "cumin":        "Cummin Seed(Jeera)",
+    "લસણ":      "Garlic",
+    "lasan":     "Garlic",
+    "garlic":    "Garlic",
 
-    # Garlic
-    "લસણ":         "Garlic",
-    "lasan":        "Garlic",
-    "garlic":       "Garlic",
+    "દિવેલા":   "Castor Seed",
+    "divela":    "Castor Seed",
+    "castor":    "Castor Seed",
+
+    "ભીંડા":    "Bhindi(Okra)",
+    "bhinda":    "Bhindi(Okra)",
+    "bhindi":    "Bhindi(Okra)",
+
+    "રીંગણ":    "Brinjal",
+    "ringan":    "Brinjal",
+    "brinjal":   "Brinjal",
 }
 
-# Gujarat mandis to check (in priority order for your target area)
-GUJARAT_MARKETS = [
-    "Bharuch", "Ankleshwar", "Hansot",
-    "Surat", "Vadodara", "Ahmedabad",
-    "Rajkot", "Bhavnagar", "Gondal"
+# Price query trigger words
+PRICE_TRIGGERS = [
+    "ભાવ", "bhav", "price", "rate", "ભાવ શું", "મંડી", "mandi",
+    "market", "વેચવ", "આજનો ભાવ", "ભાવ જો", "ભાવ ક", "ભાવ?"
 ]
 
-
-# ─────────────────────────────────────────────
-# Price detection from farmer message
-# ─────────────────────────────────────────────
-
-PRICE_TRIGGER_WORDS = [
-    "ભાવ", "bhav", "price", "rate", "ભાવ શું", "મંડી",
-    "mandi", "market", "વેચવો", "વેચાણ", "આજનો ભાવ",
-    "ભાવ જોઈ", "ભાવ કેટ", "ભાવ ક"
-]
+# Gujarat mandis near your target area — shown first
+PRIORITY_MARKETS = ["bharuch", "ankleshwar", "hansot", "surat", "vadodara"]
 
 
 def detect_mandi_query(text: str) -> tuple[bool, str | None]:
-    """
-    Returns (is_mandi_query, commodity_agmarknet_name).
-    Checks if farmer is asking about prices and which commodity.
-    """
+    """Returns (is_price_query, commodity_agmarknet_name)."""
     text_lower = text.lower()
 
-    # Check if it's a price query
-    is_price = any(w in text_lower for w in PRICE_TRIGGER_WORDS)
+    is_price = any(w in text_lower for w in PRICE_TRIGGERS)
     if not is_price:
         return False, None
 
-    # Find which commodity they're asking about
-    for gujarati_name, agmarknet_name in COMMODITY_MAP.items():
-        if gujarati_name.lower() in text_lower:
+    for key, agmarknet_name in COMMODITY_MAP.items():
+        if key.lower() in text_lower:
             return True, agmarknet_name
 
-    # Price query but commodity not detected — return True so we can ask
-    return True, None
+    return True, None   # Price query, but commodity unknown
 
 
-# ─────────────────────────────────────────────
-# Agmarknet scraper
-# ─────────────────────────────────────────────
-
-async def fetch_mandi_prices(commodity_agmarknet: str, state: str = "Gujarat") -> list[dict]:
+async def fetch_mandi_prices(commodity: str, state: str = "Gujarat") -> list[dict]:
     """
-    Scrapes today's prices from Agmarknet for a given commodity in Gujarat.
-    Falls back to yesterday if today has no data yet (prices update by noon).
-    Returns list of { market, min_price, max_price, modal_price, date }
+    Fetches prices from data.gov.in Agmarknet API.
+    Tries today, yesterday, day before — because mandis don't report on weekends/holidays.
     """
-    results = []
+    if not DATA_GOV_API_KEY:
+        print("⚠️  DATA_GOV_API_KEY not set")
+        return []
 
-    for days_back in [0, 1, 2]:   # Try today, yesterday, day before
+    for days_back in [0, 1, 2, 3]:
         check_date = date.today() - timedelta(days=days_back)
-        date_str = check_date.strftime("%d-%b-%Y")
+        date_str   = check_date.strftime("%d/%m/%Y")   # data.gov.in format
 
-        url = "https://agmarknet.gov.in/SearchCmmMkt.aspx"
         params = {
-            "Tx_Commodity":     commodity_agmarknet,
-            "Tx_State":         state,
-            "Tx_District":      "0",
-            "Tx_Market":        "0",
-            "DateFrom":         date_str,
-            "DateTo":           date_str,
-            "Fr_Date":          date_str,
-            "To_Date":          date_str,
-            "Tx_Trend":         "0",
-            "Tx_CommodityHead": commodity_agmarknet,
-            "Tx_StateHead":     state,
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer":    "https://agmarknet.gov.in/",
-            "Accept":     "text/html,application/xhtml+xml"
+            "api-key":          DATA_GOV_API_KEY,
+            "format":           "json",
+            "limit":            "50",
+            "filters[state]":   state,
+            "filters[commodity]": commodity,
+            "filters[arrival_date]": date_str,
         }
 
         try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                response = await client.get(url, params=params, headers=headers)
+            async with httpx.AsyncClient(timeout=15) as client:
+                r = await client.get(DATA_GOV_URL, params=params)
 
-            if response.status_code != 200:
+            if r.status_code != 200:
+                print(f"⚠️  data.gov.in returned {r.status_code}: {r.text[:100]}")
                 continue
 
-            soup = BeautifulSoup(response.text, "html.parser")
-            table = soup.find("table", {"id": "cphBody_GridPriceData"})
+            data    = r.json()
+            records = data.get("records", [])
 
-            if not table:
-                continue
+            if not records:
+                continue   # No data for this date, try previous day
 
-            rows = table.find_all("tr")[1:]   # Skip header
-            for row in rows:
-                cols = [td.get_text(strip=True) for td in row.find_all("td")]
-                if len(cols) >= 8:
-                    results.append({
-                        "market":      cols[2],
-                        "commodity":   cols[0],
-                        "variety":     cols[1],
-                        "min_price":   cols[4],
-                        "max_price":   cols[5],
-                        "modal_price": cols[6],
-                        "date":        cols[7] if len(cols) > 7 else date_str,
-                    })
+            # Sort: priority markets first, then by modal price descending
+            def sort_key(rec):
+                market = rec.get("market", "").lower()
+                priority = 0 if any(p in market for p in PRIORITY_MARKETS) else 1
+                return (priority, -float(rec.get("modal_price", 0) or 0))
 
-            if results:
-                # Prioritize mandis near your target area
-                results.sort(key=lambda x: (
-                    0 if any(m.lower() in x["market"].lower() for m in GUJARAT_MARKETS[:3])
-                    else 1
-                ))
-                return results[:8]   # Return top 8 markets
+            records.sort(key=sort_key)
+            print(f"📊 Mandi: found {len(records)} records for {commodity} on {date_str}")
+            return records[:8]
 
         except Exception as e:
-            print(f"⚠️  Agmarknet fetch error (day -{days_back}): {e}")
+            print(f"⚠️  Mandi fetch error (day -{days_back}): {e}")
             continue
 
     return []
 
 
-# ─────────────────────────────────────────────
-# Format prices into Gujarati WhatsApp message
-# ─────────────────────────────────────────────
+def format_price_message(commodity: str, prices: list[dict]) -> str:
+    """Format fetched prices into a clean Gujarati WhatsApp message."""
 
-def format_price_message(commodity_agmarknet: str, prices: list[dict]) -> str:
-    """Format fetched prices into a clean Gujarati message."""
-
-    # Find Gujarati name for display
-    gujarati_name = commodity_agmarknet
-    for guj, agm in COMMODITY_MAP.items():
-        if agm == commodity_agmarknet and len(guj) > 2:
-            gujarati_name = guj
+    # Get Gujarati display name
+    gujarati_name = commodity
+    for key, agm in COMMODITY_MAP.items():
+        if agm == commodity and len(key) > 2 and not key.isascii():
+            gujarati_name = key
             break
 
     if not prices:
         return (
-            f"😔 આજે {gujarati_name}ના ભાવ Agmarknet પર ઉપલબ્ધ નથી.\n\n"
-            f"કૃપા કરીને સ્થાનિક મંડીમાં સીધો સંપર્ક કરો અથવા થોડા સમય પછી ફરી પ્રયાસ કરો.\n\n"
-            f"📱 Agmarknet: agmarknet.gov.in"
+            f"😔 *{gujarati_name}* ના આજના ભાવ ઉપલબ્ધ નથી.\n\n"
+            "ભાવ સામાન્ય રીતે સોમ–શુક્ર મળે છે.\n"
+            "નજીકની મંડીમાં સીધો સંપર્ક કરો.\n\n"
+            "📱 agmarknet.gov.in"
         )
 
-    price_date = prices[0].get("date", "આજે")
-    lines = [f"📊 *{gujarati_name} — મંડી ભાવ* ({price_date})\n"]
+    price_date = prices[0].get("arrival_date", "")
+    lines = [f"📊 *{gujarati_name} — મંડી ભાવ*\n📅 {price_date}\n"]
 
     for p in prices[:6]:
-        market = p["market"]
-        modal  = p["modal_price"]
-        low    = p["min_price"]
-        high   = p["max_price"]
+        market = p.get("market", "").strip()
+        modal  = p.get("modal_price",  "—")
+        low    = p.get("min_price",    "—")
+        high   = p.get("max_price",    "—")
         lines.append(
             f"📍 *{market}*\n"
-            f"   સામાન્ય: ₹{modal}/ક્વિ\n"
-            f"   ન્યૂનતમ: ₹{low} | મહત્તમ: ₹{high}"
+            f"   સામાન્ય ભાવ: ₹{modal}/ક્વિ\n"
+            f"   ન્યૂ: ₹{low}  |  મહ: ₹{high}"
         )
 
-    lines.append("\n_સ્ત્રોત: Agmarknet (ભારત સરકાર)_")
+    lines.append("\n_સ્ત્રોત: Agmarknet, ભારત સરકાર_")
     return "\n\n".join(lines)
 
 
-# ─────────────────────────────────────────────
-# Main function called from app.py
-# ─────────────────────────────────────────────
-
 async def handle_mandi_query(text: str) -> str | None:
     """
-    If farmer is asking about prices, fetch and return formatted message.
-    Returns None if this is not a price query.
+    Main entry point called from app.py.
+    Returns formatted Gujarati price message, or None if not a price query.
     """
     is_price_query, commodity = detect_mandi_query(text)
 
@@ -242,17 +200,16 @@ async def handle_mandi_query(text: str) -> str | None:
         return None
 
     if commodity is None:
-        # Price query but no commodity detected — ask which one
         return (
-            "🌾 કયા પાકના ભાવ જોઈએ છે?\n\n"
-            "ઉદ્દાહરણ:\n"
+            "🌾 *કયા પાકના ભાવ જોઈએ છે?*\n\n"
+            "આ પ્રમાણે લખો:\n"
             "• *કપાસ ભાવ*\n"
             "• *મગફળી ભાવ*\n"
             "• *ડુંગળી ભાવ*\n"
             "• *ઘઉં ભાવ*\n"
-            "• *ટામેટા ભાવ*"
+            "• *ટામેટા ભાવ*\n"
+            "• *જીરું ભાવ*"
         )
 
-    print(f"📊 Mandi query: {commodity}")
     prices = await fetch_mandi_prices(commodity)
     return format_price_message(commodity, prices)
