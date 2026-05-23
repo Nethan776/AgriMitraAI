@@ -18,6 +18,11 @@ INDEXES = {
         "vectorizer": "nutrient_vectorizer.pkl",
         "tfidf":      "nutrient_tfidf.pkl",
     },
+    "pest_disease": {
+        "chunks":     "pest_disease_chunks.json",
+        "vectorizer": "pest_disease_vectorizer.pkl",
+        "tfidf":      "pest_disease_tfidf.pkl",
+    },
 }
 
 _loaded = {}   # cache: { "cotton": {chunks, vectorizer, tfidf}, ... }
@@ -103,6 +108,15 @@ NUTRIENT_KEYWORDS = [
 ]
 
 
+
+PEST_DISEASE_KEYWORDS = [
+    "જીવાત", "રોગ", "disease", "pest", "ફૂગ", "fungus", "બેક્ટેરિયા",
+    "bacteria", "virus", "વાઈરસ", "blight", "wilt", "leaf curl",
+    "necrosis", "alternaria", "myrothecium", "spray", "દવા", "છંટકાવ",
+    "pheromone", "trap", "ETL", "scouting", "monitoring", "ICAR",
+    "insecticide", "fungicide", "કીટ", "ઈયળ", "larvae", "nymph"
+]
+
 def get_rag_context(user_message: str, history: list = None) -> str:
     """
     Detect which knowledge base(s) are relevant and return
@@ -128,6 +142,12 @@ def get_rag_context(user_message: str, history: list = None) -> str:
         chunks = _search("nutrient", user_message, top_k=2)
         if chunks:
             results.append(("🧪 પોષણ વ્યવસ્થાપન જ્ઞાન (સ્ત્રોત: INM)", chunks))
+
+    # Check pest_disease index
+    if any(kw.lower() in recent_lower for kw in PEST_DISEASE_KEYWORDS):
+        chunks = _search("pest_disease", user_message, top_k=3)
+        if chunks:
+            results.append(("🔬 કીટ-રોગ વ્યવસ્થાપન સલાહ (સ્ત્રોત: ICAR 2024-25)", chunks))
 
     if not results:
         return ""
