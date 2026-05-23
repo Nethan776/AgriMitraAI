@@ -1,6 +1,5 @@
 import httpx
 import os
-from datetime import date, timedelta
 
 # ─────────────────────────────────────────────
 # data.gov.in Agmarknet API
@@ -109,46 +108,42 @@ async def fetch_mandi_prices(commodity: str, state: str = "Gujarat") -> list[dic
         print("⚠️  DATA_GOV_API_KEY not set")
         return []
 
-    for days_back in [0, 1, 2, 3]:
-        check_date = date.today() - timedelta(days=days_back)
-        date_str   = check_date.strftime("%d/%m/%Y")   # data.gov.in format
-
-        params = {
-            "api-key":          DATA_GOV_API_KEY,
-            "format":           "json",
-            "limit":            "50",
-            "filters[state]":   state,
-            "filters[commodity]": commodity,
-            "filters[arrival_date]": date_str,
+    # API has no date filter — returns latest available records
+    params = {
+            "api-key":              DATA_GOV_API_KEY,
+            "format":               "json",
+            "limit":                "50",
+            "filters[state.keyword]": state,
+            "filters[commodity]":   commodity,
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=15) as client:
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
                 r = await client.get(DATA_GOV_URL, params=params)
 
-            if r.status_code != 200:
-                print(f"⚠️  data.gov.in returned {r.status_code}: {r.text[:100]}")
-                continue
+        if r.status_code != 200:
+            print(f"⚠️  data.gov.in returned {r.status_code}: {r.text[:100]}")
+            return []
 
-            data    = r.json()
-            records = data.get("records", [])
+        data    = r.json()
+        records = data.get("records", [])
 
-            if not records:
-                continue   # No data for this date, try previous day
+        if not records:
+            return []
 
-            # Sort: priority markets first, then by modal price descending
-            def sort_key(rec):
-                market = rec.get("market", "").lower()
-                priority = 0 if any(p in market for p in PRIORITY_MARKETS) else 1
-                return (priority, -float(rec.get("modal_price", 0) or 0))
+        # Sort: priority markets first, then by modal price descending
+        def sort_key(rec):
+            market = rec.get("market", "").lower()
+            priority = 0 if any(p in market for p in PRIORITY_MARKETS) else 1
+            return (priority, -float(rec.get("modal_price", 0) or 0))
 
-            records.sort(key=sort_key)
-            print(f"📊 Mandi: found {len(records)} records for {commodity} on {date_str}")
-            return records[:8]
+        records.sort(key=sort_key)
+        print(f"📊 Mandi: found {len(records)} records for {commodity}")
+        return records[:8]
 
-        except Exception as e:
-            print(f"⚠️  Mandi fetch error (day -{days_back}): {e}")
-            continue
+    except Exception as e:
+        print(f"⚠️  Mandi fetch error: {e}")
+        return []
 
     return []
 
@@ -171,7 +166,7 @@ def format_price_message(commodity: str, prices: list[dict]) -> str:
             "📱 agmarknet.gov.in"
         )
 
-    price_date = prices[0].get("arrival_date", "")
+    price_date = prices[0].get("arrival_date", "તાજેતરના")
     lines = [f"📊 *{gujarati_name} — મંડી ભાવ*\n📅 {price_date}\n"]
 
     for p in prices[:6]:
