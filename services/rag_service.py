@@ -23,6 +23,11 @@ INDEXES = {
         "vectorizer": "pest_disease_vectorizer.pkl",
         "tfidf":      "pest_disease_tfidf.pkl",
     },
+    "sugarcane": {
+        "chunks":     "sugarcane_chunks.json",
+        "vectorizer": "sugarcane_vectorizer.pkl",
+        "tfidf":      "sugarcane_tfidf.pkl",
+    },
 }
 
 _loaded = {}   # cache: { "cotton": {chunks, vectorizer, tfidf}, ... }
@@ -117,6 +122,14 @@ PEST_DISEASE_KEYWORDS = [
     "insecticide", "fungicide", "કીટ", "ઈયળ", "larvae", "nymph"
 ]
 
+SUGARCANE_KEYWORDS = [
+    "શેરडी", "शेरड़ी", "sugarcane", "ganna", "શેરડ", "ઉસ", "us",
+    "borer", "ઈયળ", "red rot", "smut", "wilt", "grub", "whitefly",
+    "shoot borer", "top borer", "stem borer", "pyrilla", "mealybug",
+    "ratoon", "trash", "seed cane", "settlings", "jaggery", "gur",
+    "sugar", "ખાંડ", "ગોળ", "sugarcane mosaic", "pokkah boeng"
+]
+
 def get_rag_context(user_message: str, history: list = None) -> str:
     """
     Detect which knowledge base(s) are relevant and return
@@ -142,6 +155,12 @@ def get_rag_context(user_message: str, history: list = None) -> str:
         chunks = _search("nutrient", user_message, top_k=2)
         if chunks:
             results.append(("🧪 પોષણ વ્યવસ્થાપન જ્ઞાન (સ્ત્રોત: INM)", chunks))
+
+    # Check sugarcane index
+    if any(kw.lower() in recent_lower for kw in SUGARCANE_KEYWORDS):
+        chunks = _search("sugarcane", user_message, top_k=3)
+        if chunks:
+            results.append(("🌿 શેરડી IPM જ્ઞાન (સ્ત્રોત: NIPHM)", chunks))
 
     # Check pest_disease index
     if any(kw.lower() in recent_lower for kw in PEST_DISEASE_KEYWORDS):

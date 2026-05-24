@@ -1,0 +1,178 @@
+[
+  {
+    "topic": "early_shoot_borer",
+    "crop": "sugarcane",
+    "pest_or_disease": "early shoot borer",
+    "crop_stage": "1_3_months",
+    "region": "all",
+    "content": "Early shoot borer attacks young sugarcane shoots and causes dead hearts. Remove and destroy affected shoots. Maintain proper field sanitation and avoid ratooning heavily infested crops."
+  },
+  {
+    "topic": "early_shoot_borer_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "early shoot borer",
+    "crop_stage": "1_3_months",
+    "region": "all",
+    "content": "Use pheromone traps for monitoring early shoot borer. Release Trichogramma parasitoids where recommended. Avoid excess nitrogen fertilizer and maintain balanced irrigation."
+  },
+  {
+    "topic": "top_borer_symptoms",
+    "crop": "sugarcane",
+    "pest_or_disease": "top borer",
+    "crop_stage": "3_7_months",
+    "region": "all",
+    "content": "Top borer infestation causes spindle drying, bunchy top appearance and holes in leaves. Infested canes may show poor growth and reduced sugar recovery."
+  },
+  {
+    "topic": "top_borer_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "top borer",
+    "crop_stage": "3_7_months",
+    "region": "all",
+    "content": "Destroy affected shoots and remove infested plant parts. Maintain field hygiene and avoid water stress. Pheromone traps and biological control methods may help reduce top borer infestation."
+  },
+  {
+    "topic": "internode_borer",
+    "crop": "sugarcane",
+    "pest_or_disease": "internode borer",
+    "crop_stage": "4_8_months",
+    "region": "all",
+    "content": "Internode borer damages sugarcane internodes and reduces cane quality. Holes with frass may appear on canes. Infested canes become weak and show reduced yield."
+  },
+  {
+    "topic": "internode_borer_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "internode borer",
+    "crop_stage": "4_8_months",
+    "region": "all",
+    "content": "Remove severely affected canes and maintain clean field conditions. Avoid excessive nitrogen application and monitor crop regularly during active growth stages."
+  },
+  {
+    "topic": "pyrilla_symptoms",
+    "crop": "sugarcane",
+    "pest_or_disease": "pyrilla",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Pyrilla insects suck sap from leaves causing yellowing, drying and reduced plant vigor. Sticky honeydew and black sooty mould may develop on leaves."
+  },
+  {
+    "topic": "pyrilla_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "pyrilla",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Encourage natural enemies and maintain field sanitation. Remove heavily infested leaves when possible. Neem-based sprays may help during early infestation."
+  },
+  {
+    "topic": "whitefly_sugarcane",
+    "crop": "sugarcane",
+    "pest_or_disease": "whitefly",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Whitefly infestation causes yellowing, drying and sticky honeydew on sugarcane leaves. Black fungal growth may develop due to honeydew secretion."
+  },
+  {
+    "topic": "whitefly_management_sugarcane",
+    "crop": "sugarcane",
+    "pest_or_disease": "whitefly",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Maintain proper spacing and avoid dense crop growth. Remove severely infested leaves and encourage biological control agents. Neem-based products may help in early stages."
+  },
+  {
+    "topic": "scale_insect",
+    "crop": "sugarcane",
+    "pest_or_disease": "scale insect",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Scale insects suck sap from sugarcane leaves and stems causing yellowing, drying and weak cane growth. Severe infestation can reduce yield significantly."
+  },
+  {
+    "topic": "red_rot_disease",
+    "crop": "sugarcane",
+    "pest_or_disease": "red rot",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Red rot disease causes drying of leaves and internal reddening of canes with white patches. Infected canes may emit alcoholic smell and dry gradually."
+  },
+  {
+    "topic": "red_rot_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "red rot",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Use disease-free seed setts and resistant varieties where available. Remove and destroy infected clumps immediately. Avoid waterlogging and maintain good drainage."
+  },
+  {
+    "topic": "smut_disease",
+    "crop": "sugarcane",
+    "pest_or_disease": "smut",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Smut disease produces black whip-like structures from the cane top. Infected plants become thin, weak and produce narrow leaves."
+  },
+  {
+    "topic": "smut_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "smut",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Use healthy seed material and resistant varieties. Remove infected clumps immediately to prevent spread. Hot water treatment of seed setts may reduce infection."
+  },
+  {
+    "topic": "wilt_disease",
+    "crop": "sugarcane",
+    "pest_or_disease": "wilt",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Wilt disease causes yellowing, drying and shriveling of canes. Internal tissues may become discolored and plants gradually lose vigor."
+  },
+  {
+    "topic": "wilt_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "wilt",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Avoid ratooning affected fields and maintain crop rotation. Use healthy planting material and improve drainage conditions in the field."
+  },
+  {
+    "topic": "grassy_shoot_disease",
+    "crop": "sugarcane",
+    "pest_or_disease": "grassy shoot disease",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Grassy shoot disease causes excessive tillering and thin grassy shoots. Plants become stunted and fail to produce healthy canes."
+  },
+  {
+    "topic": "grassy_shoot_management",
+    "crop": "sugarcane",
+    "pest_or_disease": "grassy shoot disease",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Remove and destroy infected clumps immediately. Use healthy seed canes and avoid planting material from infected fields."
+  },
+  {
+    "topic": "nutrient_deficiency_sugarcane",
+    "crop": "sugarcane",
+    "pest_or_disease": "nutrient deficiency",
+    "crop_stage": "all",
+    "region": "all",
+    "content": "Nitrogen deficiency causes pale green or yellow leaves and weak growth. Potassium deficiency may cause leaf scorching and poor cane development."
+  },
+  {
+    "topic": "waterlogging_stress",
+    "crop": "sugarcane",
+    "pest_or_disease": "waterlogging stress",
+    "crop_stage": "monsoon",
+    "region": "all",
+    "content": "Excess water stagnation can weaken sugarcane roots and increase disease risk. Proper drainage and timely irrigation management are important."
+  },
+  {
+    "topic": "drought_stress_sugarcane",
+    "crop": "sugarcane",
+    "pest_or_disease": "drought stress",
+    "crop_stage": "summer",
+    "region": "all",
+    "content": "Drought stress causes leaf rolling, drying and reduced cane growth. Regular irrigation and mulching may help conserve soil moisture."
+  }
+]
