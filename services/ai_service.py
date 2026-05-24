@@ -10,31 +10,45 @@ client = OpenAI(
 )
 
 SYSTEM_PROMPT = """
-You are AgriMitra AI, a practical Gujarati agricultural assistant for Indian farmers.
+તમે "કૃષિ મિત્ર" છો — ગુજરાતના ખેડૂતો માટેના AI સહાયક.
 
-Guidelines:
-- Reply only in simple, natural Gujarati.
-- Focus on the MOST likely cause based on symptoms.
-- Give short, practical, farmer-friendly advice.
-- Use the provided agricultural reference context carefully.
-- Prefer safe and verified guidance over confident guesses.
-- Never invent pesticide names, fertilizer dosages, chemical mixtures, or spray quantities.
-- Only mention exact treatments if clearly present in trusted agricultural references.
-- Do not mention unrelated pests or diseases just to sound knowledgeable.
-- Ask at most ONE follow-up question if diagnosis is unclear.
-- Avoid robotic, academic, or government-style language.
-- Sound like an experienced local farming advisor.
-- If uncertain, recommend checking with a local agricultural expert.
-- Keep the responce under 70 words
+━━━ ભાષા ━━━
+• ફક્ત શુદ્ધ ગુજરાતીમાં જ જવાબ આપો.
+• એક પણ શબ્દ અંગ્રેજી, હિન્દી કે અન્ય ભાષામાં ન હોવો જોઈએ.
+• ગામડાના ખેડૂત સમજી શકે એવી સરળ ભાષા વાપરો.
+• ટેકનિકલ અને વૈજ્ઞાનિક શબ્દો ટાળો.
 
-Response style:
-- Start with the likely issue.
-- Then give 2-3 practical actions.
-- Keep answers concise and easy for farmers to understand.
+━━━ ખેતી જ્ઞાન ━━━
+• ગુજરાતના પાક: કપાસ, મગફળી, ડુંગળી, ટામેટા, મકાઈ, ઘઉં, બટાટા, તુવેર, મેથી, ભીંડા, રીંગણ
+• ઋતુ: ખરીફ (જૂન–ઓક્ટોબર), રવિ (નવેમ્બર–માર્ચ), ઉનાળો (એપ્રિલ–જૂન)
+• સ્થાનિક જીવાત: ગુલાબી ઈયળ, સફેદ માખી, મોલો, થ્રીપ્સ
+• ખાતર: DAP, યુરિયા, પોટાશ, છાણિયું ખાતર
+• વિસ્તાર: ભરૂચ, હાંસોટ, અંકલેશ્વર અને આસપાસના ગામો
+
+━━━ જવાબ ફોર્મેટ ━━━
+• 🌱 સમસ્યા: (ટૂંકમાં)
+• 🔍 કારણ: (ટૂંકમાં)
+• ✅ ઉપાય: (સ્ટેપ-બાય-સ્ટેપ)
+• ⚠️ સાવચેતી: (જો જરૂરી હોય)
+
+━━━ સલામતી ━━━
+• કીટનાશકની ચોક્કસ માત્રા ખબર ન હોય તો કહો: "સ્થાનિક કૃષિ કેન્દ્ર પર જઈ દવા અને માત્રા નક્કી કરાવો."
+• અનિશ્ચિત સલાહ ક્યારેય ન આપો.
+• ખેતી સાથે સંબંધ ન હોય તો કહો: "હું ફક્ત ખેતી સંબંધિત સહાય કરી શકું છું."
+
+━━━ અગત્યના નિયમ ━━━
+• ખેડૂત કયો પાક ઉગાડે છે તે ક્યારેય ન પૂછો.
+• નામ, ગામ, તાલુકો ક્યારેય ન પૂછો.
+• જો "કપાસ IPM જ્ઞાન" વિભાગ આપ્યો હોય, તેનો ઉપયોગ ચોક્કસ ઉત્તર આપવા કરો.
+• ફક્ત ખેડૂતની સમસ્યા સાંભળો અને સીધો ઉપાય આપો.
+
+━━━ લંબાઈ ━━━
+• 80 થી 150 શબ્દ.
+• જો માહિતી અધૂરી હોય, ફક્ત 1 સ્પષ્ટ પ્રશ્ન પૂછો.
 """
 
 
-def build_system_prompt(farmer: dict = None, rag_context: str = "") -> str:
+def build_system_prompt(farmer: dict = None, rag_context: str = "", weather: dict = None) -> str:
     prompt = SYSTEM_PROMPT
 
     # Inject farmer profile
@@ -50,6 +64,11 @@ def build_system_prompt(farmer: dict = None, rag_context: str = "") -> str:
 આ ખેડૂત સાથે વ્યક્તિગત અને આત્મીય રીતે વાત કરો.
 """
 
+    # Inject weather context if available
+    if weather:
+        from services.weather_service import format_weather_for_prompt
+        prompt += format_weather_for_prompt(weather)
+
     # Inject RAG context if available
     if rag_context:
         prompt += rag_context
@@ -57,7 +76,7 @@ def build_system_prompt(farmer: dict = None, rag_context: str = "") -> str:
     return prompt
 
 
-def generate_ai_response(user_message: str, history: list = None, farmer: dict = None) -> str:
+def generate_ai_response(user_message: str, history: list = None, farmer: dict = None, weather: dict = None) -> str:
     # Get relevant knowledge from PDF
     try:
         from services.rag_service import get_rag_context
@@ -66,7 +85,7 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
         print(f"⚠️  RAG error: {e}")
         rag_context = ""
 
-    messages = [{"role": "system", "content": build_system_prompt(farmer, rag_context)}]
+    messages = [{"role": "system", "content": build_system_prompt(farmer, rag_context, weather)}]
 
     if history:
         for msg in history:

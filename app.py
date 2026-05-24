@@ -23,6 +23,7 @@ from services.memory_service import (
 )
 
 from dotenv import load_dotenv
+from services.weather_service import fetch_weather, format_weather_for_farmer, format_weather_for_prompt, is_weather_query
 import os
 
 load_dotenv()
@@ -237,6 +238,18 @@ async def receive_message(request: Request):
             )
             return {"status": "ok"}
 
+        # ── FETCH WEATHER FOR FARMER'S TALUKA ────────────────────────────
+        taluka  = farmer.get("taluka") or farmer.get("village") or "Bharuch"
+        weather = await fetch_weather(taluka)
+
+        # If farmer is directly asking about weather — reply and stop
+        if is_weather_query(text):
+            weather_reply = format_weather_for_farmer(weather)
+            save_message(farmer["id"], "user",      text,         whatsapp_message_id=message_id)
+            save_message(farmer["id"], "assistant", weather_reply)
+            await send_whatsapp_reply(phone, weather_reply)
+            return {"status": "ok"}
+
         # ── LOAD HISTORY + GENERATE AI RESPONSE ──────────────────────────
         history = get_recent_messages(farmer["id"], limit=5)
 
@@ -246,7 +259,8 @@ async def receive_message(request: Request):
         reply = generate_ai_response(
             user_message=text,
             history=history,
-            farmer=farmer
+            farmer=farmer,
+            weather=weather
         )
 
         # ── SAVE + SEND ───────────────────────────────────────────────────
