@@ -23,7 +23,6 @@ from services.memory_service import (
 )
 
 from dotenv import load_dotenv
-from services.mandi_service import handle_mandi_query
 import os
 
 load_dotenv()
@@ -238,15 +237,7 @@ async def receive_message(request: Request):
             )
             return {"status": "ok"}
 
-        # ── MANDI PRICE CHECK (before AI) ────────────────────────────────
-        mandi_reply = await handle_mandi_query(text)
-        if mandi_reply:
-            save_message(farmer["id"], "user",      text,        whatsapp_message_id=message_id)
-            save_message(farmer["id"], "assistant", mandi_reply)
-            await send_whatsapp_reply(phone, mandi_reply)
-            return {"status": "ok"}
-
-        # ── LOAD HISTORY + GENERATE AI RESPONSE ──────────────────────────────
+        # ── LOAD HISTORY + GENERATE AI RESPONSE ──────────────────────────
         history = get_recent_messages(farmer["id"], limit=5)
 
         # Show typing indicator while AI is thinking
