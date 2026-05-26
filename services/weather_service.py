@@ -86,7 +86,7 @@ async def fetch_weather(taluka: str) -> dict | None:
             r = await client.get(WEATHERAPI_URL, params={
                 "key":     WEATHERAPI_KEY,
                 "q":       query,
-                "days":    3,
+                "days":    4,  # Fetch 4 days — skip today, show next 3
                 "aqi":     "no",
                 "alerts":  "no",
             })
@@ -115,7 +115,7 @@ async def fetch_weather(taluka: str) -> dict | None:
 
         # 3-day forecast
         forecast = []
-        for day in forecast_days:
+        for day in forecast_days[1:]:  # Skip today — already shown as current
             d = day["day"]
             forecast.append({
                 "date":      day["date"],
