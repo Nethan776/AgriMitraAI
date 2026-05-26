@@ -1,174 +1,158 @@
 import httpx
 import os
-from collections import defaultdict
 
 # ─────────────────────────────────────────────
-# OpenWeatherMap — Free tier: 1,000 calls/day
-# Register at: https://openweathermap.org/api
-# Add to Render env: OPENWEATHER_API_KEY=your_key
+# WeatherAPI.com
+# Key already set — add to Render env:
+# WEATHERAPI_KEY=c2b6ffa4d17042f19b9114144262605
+#
+# One call returns current + 3-day forecast
+# Docs: https://www.weatherapi.com/docs/
 # ─────────────────────────────────────────────
 
-OWM_KEY          = os.getenv("OPENWEATHER_API_KEY", "")
-OWM_CURRENT_URL  = "https://api.openweathermap.org/data/2.5/weather"
-OWM_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
+WEATHERAPI_KEY = os.getenv("WEATHERAPI_KEY", "")
+WEATHERAPI_URL = "https://api.weatherapi.com/v1/forecast.json"
 
+# Pre-cached locations for your target area
+# WeatherAPI also accepts city name strings directly,
+# but this avoids any ambiguity
 KNOWN_LOCATIONS = {
-    "bharuch":    (21.7051, 72.9959),
-    "hansot":     (21.5833, 72.8167),
-    "ankleshwar": (21.6266, 72.9986),
-    "amod":       (22.0167, 72.8667),
-    "jambusar":   (22.0561, 72.8022),
-    "vagra":      (21.4833, 72.9667),
-    "jhagadia":   (21.5833, 73.0833),
-    "valia":      (21.3833, 73.0833),
-    "surat":      (21.1702, 72.8311),
-    "vadodara":   (22.3072, 73.1812),
-    "ahmedabad":  (23.0225, 72.5714),
-    "navsari":    (20.9467, 72.9520),
-    "rajkot":     (22.3039, 70.8022),
-    "narmada":    (21.8722, 73.4882),
+    "bharuch":    "Bharuch,Gujarat,India",
+    "hansot":     "Hansot,Gujarat,India",
+    "ankleshwar": "Ankleshwar,Gujarat,India",
+    "amod":       "Amod,Gujarat,India",
+    "jambusar":   "Jambusar,Gujarat,India",
+    "vagra":      "Vagra,Gujarat,India",
+    "jhagadia":   "Jhagadia,Gujarat,India",
+    "valia":      "Valia,Gujarat,India",
+    "surat":      "Surat,Gujarat,India",
+    "vadodara":   "Vadodara,Gujarat,India",
+    "ahmedabad":  "Ahmedabad,Gujarat,India",
+    "navsari":    "Navsari,Gujarat,India",
+    "rajkot":     "Rajkot,Gujarat,India",
+    "narmada":    "Narmada,Gujarat,India",
 }
 
 
-def _condition_gujarati(weather_id: int) -> str:
-    if 200 <= weather_id < 300:
+def _condition_gujarati(text: str, precip_mm: float = 0) -> str:
+    """Convert WeatherAPI English condition to Gujarati emoji + text."""
+    t = text.lower()
+    if "thunder" in t:
         return "⛈️ ગર્જનાવાળો વરસાદ"
-    elif 300 <= weather_id < 400:
-        return "🌦️ ઝરમર વરસાદ"
-    elif weather_id == 500:
-        return "🌧️ હળવો વરસાદ"
-    elif weather_id == 501:
-        return "🌧️ મધ્યમ વરસાદ"
-    elif 502 <= weather_id < 600:
+    elif "heavy rain" in t or "torrential" in t:
         return "🌧️ ભારે વરસાદ"
-    elif 600 <= weather_id < 700:
+    elif "moderate rain" in t:
+        return "🌧️ મધ્યમ વરસાદ"
+    elif "light rain" in t or "drizzle" in t or "patchy rain" in t:
+        return "🌦️ હળવો વરસાદ"
+    elif "rain" in t:
+        return "🌧️ વરસાદ"
+    elif "snow" in t or "sleet" in t or "blizzard" in t:
         return "❄️ હિમ"
-    elif weather_id == 741:
+    elif "fog" in t or "mist" in t:
         return "🌫️ ધુમ્મસ"
-    elif 700 <= weather_id < 800:
-        return "🌫️ અસ્પષ્ટ"
-    elif weather_id == 800:
-        return "☀️ સ્વચ્છ આકાશ"
-    elif weather_id == 801:
-        return "🌤️ થોડા વાદળ"
-    elif weather_id == 802:
-        return "⛅ અડધો વાદળ"
-    elif weather_id in (803, 804):
+    elif "overcast" in t:
         return "☁️ વાદળ છે"
-    return "🌤️ સામાન્ય"
-
-
-async def _get_coords(taluka: str) -> tuple[float, float] | None:
-    key = taluka.strip().lower()
-
-    if key in KNOWN_LOCATIONS:
-        return KNOWN_LOCATIONS[key]
-
-    # OWM geocoding for unknown talukas
-    try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.get(
-                "https://api.openweathermap.org/geo/1.0/direct",
-                params={"q": f"{taluka},Gujarat,IN", "limit": 1, "appid": OWM_KEY}
-            )
-        results = r.json()
-        if results:
-            return results[0]["lat"], results[0]["lon"]
-    except Exception as e:
-        print(f"⚠️  Geocoding error for '{taluka}': {e}")
-
-    return None
+    elif "cloudy" in t:
+        return "⛅ વાદળ"
+    elif "partly cloudy" in t:
+        return "🌤️ અડધો વાદળ"
+    elif "sunny" in t or "clear" in t:
+        return "☀️ સ્વચ્છ/તડકો"
+    elif "haze" in t or "smoke" in t or "dust" in t:
+        return "🌫️ ઝાકળ/ધૂળ"
+    elif "wind" in t:
+        return "🌬️ પવનવાળો"
+    elif precip_mm > 0:
+        return "🌧️ વરસાદ"
+    return "🌤️ સામાન્ย"
 
 
 async def fetch_weather(taluka: str) -> dict | None:
-    """Fetch current weather + 3-day forecast from OpenWeatherMap."""
-
-    if not OWM_KEY:
-        print("⚠️  OPENWEATHER_API_KEY not set in environment")
+    """
+    Fetch current weather + 3-day forecast from WeatherAPI.com.
+    Single API call returns everything.
+    """
+    if not WEATHERAPI_KEY:
+        print("⚠️  WEATHERAPI_KEY not set in Render environment variables")
         return None
 
-    coords = await _get_coords(taluka)
-    if not coords:
-        print(f"⚠️  No coords for taluka: '{taluka}'")
-        return None
-
-    lat, lon = coords
-    params_base = {"lat": lat, "lon": lon, "appid": OWM_KEY, "units": "metric"}
+    # Build location query
+    location_key = taluka.strip().lower()
+    query = KNOWN_LOCATIONS.get(location_key, f"{taluka},Gujarat,India")
 
     try:
         async with httpx.AsyncClient(timeout=12) as client:
-
-            # --- Current weather ---
-            current_r = await client.get(OWM_CURRENT_URL, params=params_base)
-            print(f"🌤️  OWM current: {current_r.status_code}")
-
-            if current_r.status_code != 200:
-                print(f"⚠️  OWM current error: {current_r.text[:200]}")
-                return None
-
-            cur = current_r.json()
-
-            # --- 3-day forecast (24 x 3hr slots) ---
-            forecast_r = await client.get(
-                OWM_FORECAST_URL,
-                params={**params_base, "cnt": 24}
-            )
-            print(f"📅  OWM forecast: {forecast_r.status_code}")
-            fore = forecast_r.json() if forecast_r.status_code == 200 else {}
-
-        # Parse current
-        weather_id = cur["weather"][0]["id"]
-        temp       = round(cur["main"]["temp"])
-        feels_like = round(cur["main"]["feels_like"])
-        humidity   = cur["main"]["humidity"]
-        wind_ms    = cur["wind"]["speed"]
-        wind_kmh   = round(wind_ms * 3.6)
-        rain_now   = round(cur.get("rain", {}).get("1h", 0), 1)
-        condition  = _condition_gujarati(weather_id)
-
-        # Build daily forecast — group 3hr slots by date
-        daily = defaultdict(lambda: {"temps": [], "rain": 0.0, "ids": []})
-        for slot in fore.get("list", []):
-            date = slot["dt_txt"].split(" ")[0]
-            daily[date]["temps"].append(slot["main"]["temp"])
-            daily[date]["rain"]  += slot.get("rain", {}).get("3h", 0)
-            daily[date]["ids"].append(slot["weather"][0]["id"])
-
-        forecast = []
-        for date, d in sorted(daily.items())[:3]:
-            dominant_id = max(set(d["ids"]), key=d["ids"].count)
-            forecast.append({
-                "date":      date,
-                "max_temp":  round(max(d["temps"])),
-                "min_temp":  round(min(d["temps"])),
-                "rain_mm":   round(d["rain"], 1),
-                "condition": _condition_gujarati(dominant_id),
+            r = await client.get(WEATHERAPI_URL, params={
+                "key":     WEATHERAPI_KEY,
+                "q":       query,
+                "days":    3,
+                "aqi":     "no",
+                "alerts":  "no",
             })
 
-        print(f"✅  Weather fetched for {taluka}: {temp}°C, {condition}")
+        print(f"🌤️  WeatherAPI: {r.status_code} for '{query}'")
 
-        return {
-            "taluka":     taluka,
-            "condition":  condition,
-            "temp":       temp,
-            "feels_like": feels_like,
-            "humidity":   humidity,
-            "wind":       wind_kmh,
-            "rain_now":   rain_now,
-            "forecast":   forecast,
+        if r.status_code == 401:
+            print("⚠️  Invalid API key — check WEATHERAPI_KEY in Render")
+            return None
+        if r.status_code == 400:
+            print(f"⚠️  Location not found: '{query}'")
+            return None
+        if r.status_code != 200:
+            print(f"⚠️  WeatherAPI error: {r.status_code} {r.text[:150]}")
+            return None
+
+        data     = r.json()
+        location = data["location"]
+        current  = data["current"]
+        forecast_days = data["forecast"]["forecastday"]
+
+        # Current conditions
+        precip   = current["precip_mm"]
+        cond_txt = current["condition"]["text"]
+        condition = _condition_gujarati(cond_txt, precip)
+
+        # 3-day forecast
+        forecast = []
+        for day in forecast_days:
+            d = day["day"]
+            forecast.append({
+                "date":      day["date"],
+                "max_temp":  round(d["maxtemp_c"]),
+                "min_temp":  round(d["mintemp_c"]),
+                "rain_mm":   round(d["totalprecip_mm"], 1),
+                "rain_chance": d.get("daily_chance_of_rain", 0),
+                "condition": _condition_gujarati(d["condition"]["text"], d["totalprecip_mm"]),
+            })
+
+        result = {
+            "taluka":      location["name"],
+            "region":      location["region"],
+            "condition":   condition,
+            "temp":        round(current["temp_c"]),
+            "feels_like":  round(current["feelslike_c"]),
+            "humidity":    current["humidity"],
+            "wind":        round(current["wind_kph"]),
+            "rain_now":    round(precip, 1),
+            "uv_index":    current.get("uv", 0),
+            "forecast":    forecast,
         }
 
+        print(f"✅  Weather OK: {result['taluka']} — {result['temp']}°C, {cond_txt}")
+        return result
+
     except Exception as e:
-        print(f"⚠️  Weather fetch exception: {e}")
+        print(f"⚠️  WeatherAPI exception: {e}")
         return None
 
 
 # ─────────────────────────────────────────────
-# Formatters
+# Format for AI system prompt
 # ─────────────────────────────────────────────
 
 def format_weather_for_prompt(weather: dict) -> str:
-    """Compact block for AI system prompt context."""
+    """Compact block injected into AI context before every response."""
     if not weather:
         return ""
 
@@ -189,12 +173,12 @@ def format_weather_for_prompt(weather: dict) -> str:
     forecast_lines = "\n".join(
         f"  {f['date']}: {f['condition']}, "
         f"{f['min_temp']}–{f['max_temp']}°C, "
-        f"વરસાદ {f['rain_mm']}mm"
+        f"વરસાદ {f['rain_mm']}mm ({f['rain_chance']}% chance)"
         for f in weather["forecast"]
     )
 
     return f"""
-━━━ હવામાન — {weather['taluka']} ━━━
+━━━ હવામાન — {weather['taluka']}, {weather['region']} ━━━
 {weather['condition']} | {weather['temp']}°C (feels {weather['feels_like']}°C)
 ભેજ: {weather['humidity']}% | પવન: {weather['wind']} km/h | વરસાદ: {weather['rain_now']}mm
 ખેતી ચેતવણી: {' | '.join(alerts) if alerts else 'સામાન્ય'}
@@ -204,25 +188,31 @@ def format_weather_for_prompt(weather: dict) -> str:
 """
 
 
+# ─────────────────────────────────────────────
+# Format for direct farmer weather query
+# ─────────────────────────────────────────────
+
 def format_weather_for_farmer(weather: dict) -> str:
-    """Full Gujarati card for direct weather queries."""
+    """Full Gujarati weather card shown when farmer asks about weather."""
     if not weather:
         return (
             "😔 હાલ હવામાનની માહિતી ઉપલબ્ધ નથી.\n"
             "કૃપા કરીને થોડા સમય પછી ફરી પ્રયાસ કરો."
         )
 
-    lines = [f"🌤️ *{weather['taluka']} — આજનું હવામાન*\n"]
+    lines = [f"🌤️ *{weather['taluka']}, {weather['region']} — આજનું હવામાન*\n"]
     lines.append(weather["condition"])
     lines.append(f"🌡️ તાપમાન: *{weather['temp']}°C* (feels like {weather['feels_like']}°C)")
     lines.append(f"💧 ભેજ: *{weather['humidity']}%*")
     lines.append(f"🌬️ પવન: *{weather['wind']} km/h*")
     if weather["rain_now"] > 0:
         lines.append(f"🌧️ વરસાદ: *{weather['rain_now']}mm*")
+    if weather["uv_index"] >= 8:
+        lines.append(f"☀️ UV Index: *{weather['uv_index']}* (ખૂબ વધારે — ઢાંકીને રહો)")
 
     lines.append("\n📅 *આગામી 3 દિવસ:*")
     for f in weather["forecast"]:
-        rain_text = f" | 🌧️ {f['rain_mm']}mm" if f["rain_mm"] > 0 else ""
+        rain_text = f" | 🌧️ {f['rain_mm']}mm ({f['rain_chance']}%)" if f["rain_chance"] > 10 else ""
         lines.append(
             f"  {f['date']}: {f['condition']}, "
             f"{f['min_temp']}–{f['max_temp']}°C{rain_text}"
@@ -230,17 +220,17 @@ def format_weather_for_farmer(weather: dict) -> str:
 
     lines.append("\n💡 *ખેતી સલાહ:*")
     if weather["rain_now"] > 5:
-        lines.append("  વરસાદ છે — દવા છંટકાવ ટાળો.")
+        lines.append("  વરસાદ છે — આજે દવા છંટકાવ ટાળો.")
     elif weather["humidity"] > 80:
-        lines.append("  ભેજ વધારે — ફૂગના રોગ સતર્ક રહો.")
+        lines.append("  ભેજ વધારે — ફૂગના રોગ માટે સતર્ક રહો.")
     elif weather["temp"] > 42:
         lines.append("  ભારે ગરમી — સવારે/સાંજે સિંચાઈ કરો.")
     elif weather["wind"] > 35:
         lines.append("  તેજ પવન — આજે છંટકાવ ટાળો.")
     else:
-        lines.append("  હવામાન સામાન્ય — ખેતી માટે સારો દિવસ.")
+        lines.append("  હવામાન સામાન્ય — ખેતી માટે સારો દિવસ. ✅")
 
-    lines.append("\n_સ્ત્રોત: OpenWeatherMap_")
+    lines.append("\n_સ્ત્રોત: WeatherAPI.com_")
     return "\n".join(lines)
 
 
@@ -252,7 +242,7 @@ WEATHER_TRIGGERS = [
     "હવામાન", "weather", "વરસાદ", "rain", "ઠંડી", "ગરમી",
     "temperature", "તાપમાન", "વાદળ", "cloud", "ધુમ્મસ",
     "પવન", "wind", "humidity", "ભેજ", "આગાહી", "forecast",
-    "આજ કેવ", "વાતાવ", "છંટકાવ કર",
+    "આજ કેવ", "વાતાવ", "uv", "તડકો",
 ]
 
 
