@@ -3,28 +3,23 @@ import os
 
 # ─────────────────────────────────────────────
 # indianapi.in — IMD (India Meteorological Dept)
-# Same source as Google Weather for India
+# Docs: https://indianapi.in/documentation/weather-api
+# Base URL: https://weather.indianapi.in
+# Auth: x-api-key header
 #
-# Get free key (1000 req): https://indianapi.in/weather-api
 # Add to Render env: INDIANAPI_KEY=your_key
-#
-# Endpoints used:
-#   /india/weather?city=Bharuch   ← IMD data, India only
-#   /global/weather?location=...  ← fallback for unknown cities
+# Get free key: https://indianapi.in/weather-api
 # ─────────────────────────────────────────────
 
 INDIANAPI_KEY  = os.getenv("INDIANAPI_KEY", "")
-INDIANAPI_BASE = "https://weather.indianapi.in"
+BASE_URL       = "https://weather.indianapi.in"
 
-# ─────────────────────────────────────────────
-# Your target talukas mapped to IMD city names
-# Use exact city names that IMD recognises
-# ─────────────────────────────────────────────
-
-KNOWN_CITIES = {
+# Bharuch district talukas → nearest IMD city
+# IMD uses fuzzy matching so city names don't need to be exact
+TALUKA_TO_CITY = {
     "bharuch":    "Bharuch",
-    "hansot":     "Bharuch",      # Hansot is too small for IMD — use Bharuch
-    "ankleshwar": "Ankleshwar",
+    "hansot":     "Bharuch",
+    "ankleshwar": "Bharuch",
     "amod":       "Bharuch",
     "jambusar":   "Bharuch",
     "vagra":      "Bharuch",
@@ -38,184 +33,226 @@ KNOWN_CITIES = {
     "narmada":    "Bharuch",
 }
 
-# Forecast description → Gujarati
-def _condition_gujarati(description: str) -> str:
+
+def _to_gujarati(description: str) -> str:
+    """Convert IMD English forecast description to Gujarati."""
     if not description:
         return "🌤️ સામાન્ય"
     d = description.lower()
-    if "thunder" in d or "thunderstorm" in d:
+    if "thunder" in d:
         return "⛈️ ગર્જનાવાળો વરસાદ"
-    elif "heavy rain" in d or "heavy rainfall" in d:
+    if "heavy rain" in d:
         return "🌧️ ભારે વરસાદ"
-    elif "moderate rain" in d:
+    if "moderate rain" in d:
         return "🌧️ મધ્યમ વરસાદ"
-    elif "light rain" in d or "drizzle" in d:
+    if "light rain" in d or "drizzle" in d:
         return "🌦️ હળવો વરસાદ"
-    elif "rain" in d or "rainfall" in d or "shower" in d:
+    if "rain" in d or "shower" in d:
         return "🌧️ વરસાદ"
-    elif "snow" in d or "hail" in d:
+    if "snow" in d or "hail" in d:
         return "❄️ હિમ/કરા"
-    elif "fog" in d or "mist" in d:
+    if "fog" in d or "mist" in d:
         return "🌫️ ધુમ્મસ"
-    elif "overcast" in d or "cloudy" in d:
-        return "☁️ વાદળ"
-    elif "partly cloudy" in d or "partly" in d:
+    if "overcast" in d:
+        return "☁️ ઘેરા વાદળ"
+    if "cloudy" in d:
+        return "⛅ વાદળ"
+    if "partly cloudy" in d:
         return "🌤️ અડધો વાદળ"
-    elif "clear" in d or "sunny" in d or "fair" in d:
+    if "clear" in d or "sunny" in d or "fair" in d or "mainly clear" in d:
         return "☀️ સ્વચ્છ/તડકો"
-    elif "dust" in d or "haze" in d or "smoke" in d:
+    if "dust" in d or "haze" in d or "smoke" in d:
         return "🌫️ ધૂળ/ઝાકળ"
-    elif "wind" in d or "squall" in d:
+    if "wind" in d or "squall" in d:
         return "🌬️ પવન"
-    return "🌤️ " + description[:30]
+    return "🌤️ " + description[:25]
 
 
 async def fetch_weather(taluka: str) -> dict | None:
     """
-    Fetch IMD weather data for a taluka via indianapi.in.
-    Falls back to /global/weather if IMD city not found.
+    Fetch IMD weather for a taluka.
+    Primary: /india/weather (IMD data, most accurate for India)
+    Fallback: /global/weather (if city not in IMD database)
     """
     if not INDIANAPI_KEY:
         print("⚠️  INDIANAPI_KEY not set in Render environment variables")
         return None
 
-    key_lower  = taluka.strip().lower()
-    city_query = KNOWN_CITIES.get(key_lower, taluka.strip())
-
+    city = TALUKA_TO_CITY.get(taluka.strip().lower(), taluka.strip())
     headers = {"x-api-key": INDIANAPI_KEY}
 
-    try:
-        async with httpx.AsyncClient(timeout=12) as client:
+    async with httpx.AsyncClient(timeout=12) as client:
 
-            # ── Try IMD endpoint first ──────────────────────────
+        # ── Primary: IMD endpoint ──────────────────────────────
+        try:
             r = await client.get(
-                f"{INDIANAPI_BASE}/india/weather",
-                params={"city": city_query},
+                f"{BASE_URL}/india/weather",
+                params={"city": city},
                 headers=headers
             )
-            print(f"🌤️  indianapi /india/weather [{city_query}]: {r.status_code}")
+            print(f"🌤️  IMD [{city}]: {r.status_code}")
 
             if r.status_code == 200:
-                data = r.json()
-                return _parse_india_response(data, taluka)
+                raw = r.json()
+                result = _parse_imd(raw, taluka)
+                if result:
+                    return result
 
-            # ── Fallback to global endpoint ─────────────────────
-            print(f"⚠️  IMD endpoint failed ({r.status_code}) — trying global fallback")
+        except Exception as e:
+            print(f"⚠️  IMD request error: {e}")
+
+        # ── Fallback: global endpoint ─────────────────────────
+        try:
             r2 = await client.get(
-                f"{INDIANAPI_BASE}/global/weather",
-                params={"location": f"{taluka},Gujarat,India", "days": 3},
+                f"{BASE_URL}/global/weather",
+                params={"location": f"{city},Gujarat,India", "days": 3},
                 headers=headers
             )
-            print(f"🌤️  indianapi /global/weather: {r2.status_code}")
+            print(f"🌤️  Global fallback [{city}]: {r2.status_code}")
 
             if r2.status_code == 200:
-                return _parse_global_response(r2.json(), taluka)
+                return _parse_global(r2.json(), taluka)
 
-            print(f"⚠️  Both endpoints failed. Last error: {r2.text[:150]}")
-            return None
+        except Exception as e:
+            print(f"⚠️  Global fallback error: {e}")
 
-    except Exception as e:
-        print(f"⚠️  Weather fetch exception: {e}")
-        return None
+    print(f"⚠️  All weather fetches failed for '{taluka}'")
+    return None
 
 
-def _parse_india_response(data: dict, taluka: str) -> dict | None:
-    """Parse the /india/weather IMD response format."""
+def _parse_imd(data: dict, taluka: str) -> dict | None:
+    """
+    Parse /india/weather response.
+
+    Response structure:
+    {
+      "city": "Bharuch",
+      "weather": {
+        "current": {
+          "humidity": {"morning": 60, "evening": 45},
+          "rainfall": null or number,
+          "temperature": {
+            "max": {"value": 40.0, "departure": 1.2},
+            "min": {"value": 28.0, "departure": 0.5}
+          }
+        },
+        "forecast": [
+          {"date": "31-May-2026", "max_temp": 41, "min_temp": 28, "description": "Clear sky"},
+          {"date": "01-Jun-2026", "max_temp": 40, "min_temp": 27, "description": "Partly cloudy"},
+          ...
+        ],
+        "astronomical": {"sunrise": "06:01", "sunset": "19:42", ...}
+      }
+    }
+    """
     try:
-        city    = data.get("city", taluka)
-        weather = data.get("weather", {})
-        current = weather.get("current", {})
+        city_name = data.get("city", taluka)
+        weather   = data.get("weather", {})
+        current   = weather.get("current", {})
+        forecast  = weather.get("forecast", [])
+        astro     = weather.get("astronomical", {})
 
+        # Temperature
         temp_data = current.get("temperature", {})
         max_temp  = temp_data.get("max", {}).get("value")
         min_temp  = temp_data.get("min", {}).get("value")
-        avg_temp  = round((max_temp + min_temp) / 2) if max_temp and min_temp else None
 
-        humidity_data = current.get("humidity", {})
-        humidity = humidity_data.get("morning") or humidity_data.get("evening") or 0
+        # Humidity — take morning or evening, whichever is available
+        hum_data  = current.get("humidity", {})
+        humidity  = hum_data.get("morning") or hum_data.get("evening") or 0
 
-        rainfall = current.get("rainfall") or 0
+        # Rainfall
+        rainfall  = current.get("rainfall") or 0
 
-        # Build forecast from IMD daily forecast
-        raw_forecast = weather.get("forecast", [])
-        forecast = []
-        for day in raw_forecast[1:4]:   # Skip today (index 0), take next 3
-            forecast.append({
-                "date":        day.get("date", ""),
-                "max_temp":    day.get("max_temp"),
-                "min_temp":    day.get("min_temp"),
-                "rain_mm":     0,       # IMD forecast has description not mm
-                "rain_chance": 0,
-                "condition":   _condition_gujarati(day.get("description", "")),
+        # Today's condition comes from forecast[0] description
+        today_desc = forecast[0].get("description", "") if forecast else ""
+        condition  = _to_gujarati(today_desc)
+
+        # Next 3 days — skip index 0 (today)
+        future = []
+        for day in forecast[1:4]:
+            future.append({
+                "date":      day.get("date", ""),
+                "max_temp":  day.get("max_temp"),
+                "min_temp":  day.get("min_temp"),
+                "condition": _to_gujarati(day.get("description", "")),
             })
 
-        # Today's condition from forecast[0] description
-        today_desc = raw_forecast[0].get("description", "") if raw_forecast else ""
-        condition  = _condition_gujarati(today_desc)
-
-        print(f"✅  IMD weather: {city} — max {max_temp}°C, min {min_temp}°C")
+        print(f"✅  IMD parsed: {city_name} — {max_temp}°C max, {min_temp}°C min, {humidity}% humidity")
 
         return {
-            "taluka":     taluka,
-            "city":       city,
-            "source":     "IMD",
-            "condition":  condition,
-            "temp":       avg_temp or max_temp,
-            "temp_max":   max_temp,
-            "temp_min":   min_temp,
-            "feels_like": avg_temp,    # IMD doesn't provide feels_like
-            "humidity":   humidity,
-            "wind":       0,            # IMD current doesn't give wind speed
-            "rain_now":   rainfall,
-            "uv_index":   0,
-            "forecast":   forecast,
+            "taluka":   taluka,
+            "city":     city_name,
+            "source":   "IMD",
+            "condition": condition,
+            "today_desc": today_desc,
+            "max_temp": max_temp,
+            "min_temp": min_temp,
+            "humidity": humidity,
+            "rainfall": rainfall,
+            "sunrise":  astro.get("sunrise", ""),
+            "sunset":   astro.get("sunset", ""),
+            "forecast": future,
         }
 
     except Exception as e:
-        print(f"⚠️  IMD parse error: {e}")
+        print(f"⚠️  IMD parse error: {e} | raw: {str(data)[:200]}")
         return None
 
 
-def _parse_global_response(data: dict, taluka: str) -> dict | None:
-    """Parse the /global/weather fallback response format."""
+def _parse_global(data: dict, taluka: str) -> dict | None:
+    """
+    Parse /global/weather fallback response.
+
+    Response structure:
+    {
+      "location": "Bharuch, Gujarat",
+      "current": {
+        "temperature": 38.0, "feels_like": 42.0,
+        "humidity": 35, "wind_speed": 18.0,
+        "condition": "Sunny", "uv_index": 8
+      },
+      "forecast": [
+        {"date": "2026-05-31", "max_temp": 41, "min_temp": 28,
+         "hourly": [{"condition": "Sunny", "chance_of_rain": 0, ...}, ...]}
+      ]
+    }
+    """
     try:
         current  = data.get("current", {})
-        forecast = []
+        raw_fore = data.get("forecast", [])
 
-        for day in data.get("forecast", []):
+        # Skip index 0 if it's today
+        future = []
+        for day in raw_fore[1:4]:
             hourly   = day.get("hourly", [{}])
             rain_ch  = max((h.get("chance_of_rain", 0) for h in hourly), default=0)
-            forecast.append({
-                "date":        day.get("date", ""),
-                "max_temp":    day.get("max_temp"),
-                "min_temp":    day.get("min_temp"),
-                "rain_mm":     0,
-                "rain_chance": rain_ch,
-                "condition":   _condition_gujarati(day.get("condition", "")),
+            future.append({
+                "date":      day.get("date", ""),
+                "max_temp":  day.get("max_temp"),
+                "min_temp":  day.get("min_temp"),
+                "condition": _to_gujarati(
+                    hourly[12].get("condition", "") if len(hourly) > 12
+                    else (hourly[0].get("condition", "") if hourly else "")
+                ),
             })
 
-        # Skip today from forecast
-        forecast = forecast[1:4]
-
-        condition = _condition_gujarati(current.get("condition", ""))
-        temp      = round(current.get("temperature", 0))
-
-        print(f"✅  Global weather fallback: {taluka} — {temp}°C")
+        temp = round(current.get("temperature", 0))
+        print(f"✅  Global parsed: {taluka} — {temp}°C")
 
         return {
             "taluka":     taluka,
             "city":       data.get("location", taluka),
             "source":     "Global",
-            "condition":  condition,
-            "temp":       temp,
-            "temp_max":   temp,
-            "temp_min":   temp,
-            "feels_like": round(current.get("feels_like", temp)),
+            "condition":  _to_gujarati(current.get("condition", "")),
+            "today_desc": current.get("condition", ""),
+            "max_temp":   temp,
+            "min_temp":   temp,
             "humidity":   current.get("humidity", 0),
-            "wind":       round(current.get("wind_speed", 0)),
-            "rain_now":   0,
-            "uv_index":   current.get("uv_index", 0),
-            "forecast":   forecast,
+            "rainfall":   0,
+            "sunrise":    "",
+            "sunset":     "",
+            "forecast":   future,
         }
 
     except Exception as e:
@@ -224,7 +261,7 @@ def _parse_global_response(data: dict, taluka: str) -> dict | None:
 
 
 # ─────────────────────────────────────────────
-# Format for AI system prompt
+# Format for AI system prompt context
 # ─────────────────────────────────────────────
 
 def format_weather_for_prompt(weather: dict) -> str:
@@ -232,36 +269,28 @@ def format_weather_for_prompt(weather: dict) -> str:
         return ""
 
     alerts = []
-    temp = weather.get("temp") or weather.get("temp_max") or 0
+    max_t = weather.get("max_temp") or 0
     if weather["humidity"] > 80:
         alerts.append("ભેજ વધારે — ફૂગ/રોગનો ખતરો")
     if weather["humidity"] < 25:
         alerts.append("ભેજ ઓછો — સૂકવણી")
-    if temp > 42:
+    if max_t > 42:
         alerts.append("ભારે ગરમી — સવાર/સાંજ સિંચાઈ")
-    if temp < 10:
+    if max_t < 10:
         alerts.append("ઠંડી — નાના પાકને જોખમ")
-    if weather["rain_now"] > 5:
+    if weather["rainfall"] and weather["rainfall"] > 5:
         alerts.append("વરસાદ — છંટકાવ ટાળો")
-    if weather["wind"] > 35:
-        alerts.append("તેજ પવન — છંટકાવ ટાળો")
 
     forecast_lines = "\n".join(
         f"  {f['date']}: {f['condition']}, {f['min_temp']}–{f['max_temp']}°C"
         for f in weather["forecast"]
     )
 
-    temp_display = (
-        f"{weather['temp_min']}–{weather['temp_max']}°C"
-        if weather.get("temp_max") and weather.get("temp_min")
-        else f"{temp}°C"
-    )
-
     return f"""
-━━━ હવામાન — {weather['taluka']} (IMD) ━━━
-{weather['condition']} | {temp_display}
-ભેજ: {weather['humidity']}% | વરસાદ: {weather['rain_now']}mm
-ખેતી ચેતવણી: {' | '.join(alerts) if alerts else 'સામાન્ય'}
+━━━ હવામાન — {weather['taluka']} ({weather['source']}) ━━━
+{weather['condition']}
+તાપમાન: {weather['min_temp']}–{weather['max_temp']}°C | ભેજ: {weather['humidity']}%
+ચેતવણી: {' | '.join(alerts) if alerts else 'સામાન્ય'}
 આગામી 3 દિવસ:
 {forecast_lines}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -269,7 +298,7 @@ def format_weather_for_prompt(weather: dict) -> str:
 
 
 # ─────────────────────────────────────────────
-# Format for farmer direct weather query
+# Format for direct farmer weather query
 # ─────────────────────────────────────────────
 
 def format_weather_for_farmer(weather: dict) -> str:
@@ -279,25 +308,27 @@ def format_weather_for_farmer(weather: dict) -> str:
             "કૃપા કરીને થોડા સમય પછી ફરી પ્રયાસ કરો."
         )
 
-    temp     = weather.get("temp") or weather.get("temp_max")
-    temp_max = weather.get("temp_max")
-    temp_min = weather.get("temp_min")
+    max_t    = weather.get("max_temp")
+    min_t    = weather.get("min_temp")
+    humidity = weather["humidity"]
+    rainfall = weather.get("rainfall") or 0
     source   = weather.get("source", "IMD")
 
     lines = [f"🌤️ *{weather['taluka']} — આજનું હવામાન* (સ્ત્રોત: {source})\n"]
     lines.append(weather["condition"])
 
-    if temp_max and temp_min:
-        lines.append(f"🌡️ તાપમાન: *{temp_min}°C – {temp_max}°C*")
-    else:
-        lines.append(f"🌡️ તાપમાન: *{temp}°C*")
+    if max_t and min_t:
+        lines.append(f"🌡️ તાપમાન: *{min_t}°C – {max_t}°C*")
+    elif max_t:
+        lines.append(f"🌡️ તાપમાન: *{max_t}°C*")
 
-    lines.append(f"💧 ભેજ: *{weather['humidity']}%*")
+    lines.append(f"💧 ભેજ: *{humidity}%*")
 
-    if weather["wind"] > 0:
-        lines.append(f"🌬️ પવન: *{weather['wind']} km/h*")
-    if weather["rain_now"] > 0:
-        lines.append(f"🌧️ વરસાદ: *{weather['rain_now']}mm*")
+    if rainfall and rainfall > 0:
+        lines.append(f"🌧️ વરસાદ: *{rainfall}mm*")
+
+    if weather.get("sunrise"):
+        lines.append(f"🌅 સૂર્યોદય: {weather['sunrise']} | 🌇 સૂર્યાસ્ત: {weather['sunset']}")
 
     if weather["forecast"]:
         lines.append("\n📅 *આગામી 3 દિવસ:*")
@@ -308,14 +339,12 @@ def format_weather_for_farmer(weather: dict) -> str:
             )
 
     lines.append("\n💡 *ખેતી સલાહ:*")
-    if weather["rain_now"] > 5:
+    if rainfall > 5:
         lines.append("  વરસાદ છે — આજે દવા છંટકાવ ટાળો.")
-    elif weather["humidity"] > 80:
+    elif humidity > 80:
         lines.append("  ભેજ વધારે — ફૂગના રોગ સતર્ક રહો.")
-    elif temp and temp > 42:
+    elif max_t and max_t > 42:
         lines.append("  ભારે ગરમી — સવારે/સાંજે સિંચાઈ કરો.")
-    elif weather["wind"] > 35:
-        lines.append("  તેજ પવન — આજે છંટકાવ ટાળો.")
     else:
         lines.append("  હવામાન સામાન્ય — ખેતી માટે સારો દિવસ. ✅")
 
