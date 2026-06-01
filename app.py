@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from fastapi import FastAPI, Request, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from services.ai_service import generate_ai_response
@@ -60,7 +60,13 @@ async def chat(request: ChatRequest):
         print(f"CHAT ERROR: {e}")
         return {"error": str(e)}
 
-
+@app.get("/privacy")
+async def privacy():
+    return HTMLResponse("""
+    <h1>Privacy Policy</h1>
+    <p>AgriMitra AI collects WhatsApp messages and phone numbers solely to provide agricultural assistance. User data is not sold or shared with third parties. Conversation data may be stored to improve response quality and provide conversational context.</p>
+    <p>For questions, contact: your@email.com</p>
+    """)
 # ─────────────────────────────────────────────
 # WhatsApp Webhook — Verification (GET)
 # ─────────────────────────────────────────────
