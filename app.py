@@ -53,39 +53,72 @@ async def health_check():
 class ChatRequest(BaseModel):
     message: str
 
+def send_openwa_reply(
+    session_id: str,
+    chat_id: str,
+    text: str
+):
+    try:
+        response = requests.post(
+            f"{OPENWA_URL}/api/sessions/{session_id}/messages/send-text",
+            headers={
+                "X-API-Key": OPENWA_API_KEY,
+                "Content-Type": "application/json"
+            },
+            json={
+                "chatId": chat_id,
+                "text": text
+            },
+            timeout=30
+        )
+
+        print(
+            f"OpenWA Send: {response.status_code} | {response.text}"
+        )
+
+    except Exception as e:
+        print(f"OpenWA Send Error: {e}")
+
+
 @app.post("/openwa-webhook")
-
-def send_openwa_reply(session_id: str, chat_id: str, text: str):
-    requests.post(
-        f"{OPENWA_URL}/api/sessions/{session_id}/messages/send-text",
-        headers={
-            "X-API-Key": OPENWA_API_KEY,
-            "Content-Type": "application/json"
-        },
-        json={
-            "chatId": chat_id,
-            "text": text
-        },
-        timeout=30
-    )
-
 async def openwa_webhook(request: Request):
 
-    payload = await request.json()
+    try:
 
-    session_id = payload["sessionId"]
-    chat_id = payload["data"]["chatId"]
-    user_message = payload["data"]["body"]
+        payload = await request.json()
 
-    reply = generate_ai_response(user_message)
+        print("OPENWA PAYLOAD:", payload)
 
-    send_openwa_reply(
-        session_id=session_id,
-        chat_id=chat_id,
-        text=reply
-    )
+        if payload.get("event") != "message.received":
+            return {"status": "ignored"}
 
-    return {"status": "ok"}
+        session_id = payload.get("sessionId")
+
+        data = payload.get("data", {})
+
+        chat_id = data.get("chatId")
+        user_message = data.get("body", "")
+
+        if not chat_id or not user_message:
+            return {"status": "ignored"}
+
+        reply = generate_ai_response(
+            user_message=user_message,
+            history=[],
+            farmer=None
+        )
+
+        send_openwa_reply(
+            session_id=session_id,
+            chat_id=chat_id,
+            text=reply
+        )
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        print(f"OPENWA WEBHOOK ERROR: {e}")
+        return {"status": "ok"}
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
