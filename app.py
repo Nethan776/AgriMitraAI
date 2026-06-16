@@ -25,8 +25,11 @@ from services.memory_service import (
 from dotenv import load_dotenv
 from services.weather_service import fetch_weather, format_weather_for_farmer, format_weather_for_prompt, is_weather_query
 import os
+import requests
 
 load_dotenv()
+OPENWA_URL = os.getenv("OPENWA_URL")
+OPENWA_API_KEY = os.getenv("OPENWA_API_KEY")
 
 app = FastAPI()
 
@@ -51,13 +54,36 @@ class ChatRequest(BaseModel):
     message: str
 
 @app.post("/openwa-webhook")
-async def openwa_webhook(request: Request):
-    data = await request.json()
 
-    print("\n" + "="*50)
-    print("OPENWA PAYLOAD")
-    print(data)
-    print("="*50)
+def send_openwa_reply(session_id: str, chat_id: str, text: str):
+    requests.post(
+        f"{OPENWA_URL}/api/sessions/{session_id}/messages/send-text",
+        headers={
+            "X-API-Key": OPENWA_API_KEY,
+            "Content-Type": "application/json"
+        },
+        json={
+            "chatId": chat_id,
+            "text": text
+        },
+        timeout=30
+    )
+
+async def openwa_webhook(request: Request):
+
+    payload = await request.json()
+
+    session_id = payload["sessionId"]
+    chat_id = payload["data"]["chatId"]
+    user_message = payload["data"]["body"]
+
+    reply = generate_ai_response(user_message)
+
+    send_openwa_reply(
+        session_id=session_id,
+        chat_id=chat_id,
+        text=reply
+    )
 
     return {"status": "ok"}
 
@@ -112,10 +138,7 @@ async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str
 
     # ── Step 1: received name, ask village ──
     if step == "ask_name":
-        update_farmer_details(farmer["id"], {
-            "name":            text,
-            "onboarding_step": "ask_village"
-        })
+        update_farmer_details(farmer["id"], {"name":text,"onboarding_step": "ask_village"})
         save_message(farmer["id"], "user",      text, whatsapp_message_id=message_id)
         save_message(farmer["id"], "assistant", "તમારું ગામ કયું છે?")
         await send_whatsapp_reply(phone, "તમારું ગામ કયું છે?")
@@ -294,34 +317,7 @@ async def receive_message(request: Request):
 # Voice Transcription via Groq Whisper API
 # ─────────────────────────────────────────────
 
-def transcribe_audio(audio_bytes: bytes) -> str | None:
-    try:
-        from groq import Groq
-        import tempfile
 
-        groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as f:
-            f.write(audio_bytes)
-            tmp_path = f.name
-
-        with open(tmp_path, "rb") as audio_file:
-            result = groq_client.audio.transcriptions.create(
-                model="whisper-large-v3",
-                file=audio_file,
-                language="gu",
-                response_format="text"
-            )
-
-        os.unlink(tmp_path)
-
-        transcription = result.strip() if isinstance(result, str) else str(result).strip()
-        print(f"📝 Groq transcription: {transcription}")
-        return transcription or None
-
-    except Exception as e:
-        print(f"❌ Groq transcription error: {e}")
-        return None
 
 
 # uvicorn app:app --reload
