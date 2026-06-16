@@ -50,6 +50,16 @@ async def health_check():
 class ChatRequest(BaseModel):
     message: str
 
+@app.post("/openwa-webhook")
+async def openwa_webhook(request: Request):
+    data = await request.json()
+
+    print("\n" + "="*50)
+    print("OPENWA PAYLOAD")
+    print(data)
+    print("="*50)
+
+    return {"status": "ok"}
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
@@ -227,7 +237,6 @@ async def receive_message(request: Request):
                 else:
                     await send_whatsapp_reply(
                         phone,
-                        "🎤 અવાજ સંદેશ મળ્યો!\n\n"
                         "અત્યારે અવાજ સમજવાની સુવિધા ઉપલબ્ધ નથી.\n"
                         "કૃપા કરીને ટેક્સ્ટ (ટાઇપ) માં સમસ્યા જણાવો."
                     )
