@@ -63,8 +63,6 @@ SYSTEM_PROMPT = """
 
 હંમેશા ખેડૂતને મદદરૂપ, વ્યવહારુ અને વિશ્વાસપાત્ર સલાહ આપો.
 """
-w
-
 
 def build_system_prompt(farmer: dict = None, rag_context: str = "", weather: dict = None) -> str:
     prompt = SYSTEM_PROMPT
