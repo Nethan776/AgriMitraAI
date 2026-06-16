@@ -59,10 +59,17 @@ def send_openwa_reply(
     text: str
 ):
     try:
+
+        url = (
+            f"{OPENWA_URL}"
+            f"/api/sessions/{session_id}/messages/send-text"
+        )
+
         response = requests.post(
-            f"{OPENWA_URL}/api/sessions/{session_id}/messages/send-text",
+            url,
             headers={
                 "X-API-Key": OPENWA_API_KEY,
+                "ngrok-skip-browser-warning": "true",
                 "Content-Type": "application/json"
             },
             json={
@@ -72,53 +79,12 @@ def send_openwa_reply(
             timeout=30
         )
 
-        print(
-            f"OpenWA Send: {response.status_code} | {response.text}"
-        )
+        print("SEND URL:", url)
+        print("STATUS:", response.status_code)
+        print("BODY:", response.text)
 
     except Exception as e:
         print(f"OpenWA Send Error: {e}")
-
-
-@app.post("/openwa-webhook")
-async def openwa_webhook(request: Request):
-
-    try:
-
-        payload = await request.json()
-
-        print("OPENWA PAYLOAD:", payload)
-
-        if payload.get("event") != "message.received":
-            return {"status": "ignored"}
-
-        session_id = payload.get("sessionId")
-
-        data = payload.get("data", {})
-
-        chat_id = data.get("chatId")
-        user_message = data.get("body", "")
-
-        if not chat_id or not user_message:
-            return {"status": "ignored"}
-
-        reply = generate_ai_response(
-            user_message=user_message,
-            history=[],
-            farmer=None
-        )
-
-        send_openwa_reply(
-            session_id=session_id,
-            chat_id=chat_id,
-            text=reply
-        )
-
-        return {"status": "ok"}
-
-    except Exception as e:
-        print(f"OPENWA WEBHOOK ERROR: {e}")
-        return {"status": "ok"}
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
