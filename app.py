@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from fastapi import FastAPI, Request, Query
+from fastapi import FastAPI, Request, Query, BackgroundTasks
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
@@ -86,28 +86,12 @@ def send_openwa_reply(
     except Exception as e:
         print(f"OpenWA Send Error: {e}")
 
-
-@app.post("/openwa-webhook")
-async def openwa_webhook(request: Request):
-
+def process_openwa_message(
+    session_id: str,
+    chat_id: str,
+    user_message: str
+):
     try:
-
-        payload = await request.json()
-
-        print("OPENWA PAYLOAD:", payload)
-
-        if payload.get("event") != "message.received":
-            return {"status": "ignored"}
-
-        session_id = payload.get("sessionId")
-
-        data = payload.get("data", {})
-
-        chat_id = data.get("chatId")
-        user_message = data.get("body", "")
-
-        if not chat_id or not user_message:
-            return {"status": "ignored"}
 
         reply = generate_ai_response(
             user_message=user_message,
@@ -121,7 +105,38 @@ async def openwa_webhook(request: Request):
             text=reply
         )
 
-        return {"status": "ok"}
+    except Exception as e:
+        print(f"BACKGROUND ERROR: {e}")        
+
+
+@app.post("/openwa-webhook")
+async def openwa_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks
+):
+
+    payload = await request.json()
+
+    print("OPENWA PAYLOAD:", payload)
+
+    if payload.get("event") != "message.received":
+        return {"status": "ignored"}
+
+    session_id = payload["sessionId"]
+
+    data = payload["data"]
+
+    chat_id = data["chatId"]
+    user_message = data["body"]
+
+    background_tasks.add_task(
+        process_openwa_message,
+        session_id,
+        chat_id,
+        user_message
+    )
+
+    return {"status": "ok"}
 
     except Exception as e:
         print(f"OPENWA WEBHOOK ERROR: {e}")
