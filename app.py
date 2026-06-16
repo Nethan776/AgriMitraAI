@@ -138,9 +138,6 @@ async def openwa_webhook(
 
     return {"status": "ok"}
 
-    except Exception as e:
-        print(f"OPENWA WEBHOOK ERROR: {e}")
-        return {"status": "ok"}
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
