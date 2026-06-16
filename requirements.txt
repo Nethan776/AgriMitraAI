@@ -9,3 +9,4 @@ pypdf
 pdfplumber
 scikit-learn
 numpy
+requests
