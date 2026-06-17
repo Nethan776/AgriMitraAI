@@ -89,14 +89,42 @@ def send_openwa_reply(
 def process_openwa_message(
     session_id: str,
     chat_id: str,
-    user_message: str
+    user_message: str,
+    message_id: str
 ):
     try:
 
+        farmer, _ = get_or_create_farmer(chat_id)
+
+        if is_duplicate_message(
+            farmer["id"],
+            message_id
+        ):
+            print("Duplicate message ignored")
+            return
+
+        history = get_recent_messages(
+            farmer["id"],
+            limit=5
+        )
+
         reply = generate_ai_response(
             user_message=user_message,
-            history=[],
-            farmer=None
+            history=history,
+            farmer=farmer
+        )
+
+        save_message(
+            farmer["id"],
+            "user",
+            user_message,
+            whatsapp_message_id=message_id
+        )
+
+        save_message(
+            farmer["id"],
+            "assistant",
+            reply
         )
 
         send_openwa_reply(
@@ -128,13 +156,15 @@ async def openwa_webhook(
 
     chat_id = data["chatId"]
     user_message = data["body"]
+    message_id = data["id"]
 
     background_tasks.add_task(
-        process_openwa_message,
-        session_id,
-        chat_id,
-        user_message
-    )
+    process_openwa_message,
+    session_id,
+    chat_id,
+    user_message,
+    message_id
+)
 
     return {"status": "ok"}
 
