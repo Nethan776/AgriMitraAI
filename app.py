@@ -122,7 +122,7 @@ async def openwa_webhook(
     if payload.get("event") != "message.received":
         return {"status": "ignored"}
 
-    session_id = payload["sessionId"]
+    session_id = "b31e3a97-b63d-4cf7-9b66-75a2a1215789"
 
     data = payload["data"]
 
