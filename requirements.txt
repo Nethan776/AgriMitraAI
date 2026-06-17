@@ -7,6 +7,6 @@ supabase
 groq
 pypdf
 pdfplumber
-scikit-learn
+scikit-learn==1.8.0
 numpy
 requests
