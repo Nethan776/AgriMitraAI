@@ -1,0 +1,193 @@
+{
+  "chunks": [
+    {
+      "id": "cotton_nitrogen_deficiency",
+      "crop": "cotton",
+      "problem_type": "macronutrient_deficiency",
+      "priority": 1,
+      "confidence": "high",
+      "symptom_keywords": [
+        "old leaves yellow",
+        "slow growth",
+        "lower leaves yellow",
+        "small leaves"
+      ],
+      "symptoms_gujarati": [
+        "જૂના પાન પીળા પડે",
+        "છોડની વૃદ્ધિ ધીમી થાય",
+        "નીચલા પાન પહેલા પીળા થાય",
+        "પાન નાના રહે"
+      ],
+      "likely_causes": [
+        "nitrogen deficiency",
+        "imbalanced fertilization",
+        "low soil fertility"
+      ],
+      "verification_questions": [
+        "શું પહેલા જૂના પાન પીળા થાય છે?",
+        "છોડની વૃદ્ધિ સામાન્ય કરતાં ધીમી છે?"
+      ],
+      "recommendations": [
+        "સંતુલિત નાઇટ્રોજન ખાતર આપો",
+        "જમીન પરીક્ષણ કરાવો",
+        "અતિશય યુરિયાનો ઉપયોગ ટાળો"
+      ],
+      "avoid": [
+        "જરૂર વગર કીટનાશક છાંટવું",
+        "અતિરેક ખાતર ઉપયોગ"
+      ],
+      "source": "ICAR INM Guide"
+    },
+
+    {
+      "id": "cotton_potassium_deficiency",
+      "crop": "cotton",
+      "problem_type": "macronutrient_deficiency",
+      "priority": 1,
+      "confidence": "high",
+      "symptom_keywords": [
+        "leaf edge drying",
+        "yellow leaf margins",
+        "brown leaf edges",
+        "slow plant growth"
+      ],
+      "symptoms_gujarati": [
+        "પાનની કિનારીઓ સૂકાઈ જાય",
+        "પાનની ધાર પીળી પડે",
+        "પાન ભૂરા થવા લાગે",
+        "છોડ નબળો લાગે"
+      ],
+      "likely_causes": [
+        "potassium deficiency",
+        "water stress",
+        "imbalanced NPK fertilization"
+      ],
+      "verification_questions": [
+        "શું પાનની કિનારીઓ પહેલા પીળી પડે છે?",
+        "ખેતરમાં પાણીની અછત રહે છે?"
+      ],
+      "recommendations": [
+        "સંતુલિત NPK ખાતર વાપરો",
+        "નિયમિત સિંચાઈ રાખો",
+        "જમીન પરીક્ષણ કરાવો"
+      ],
+      "avoid": [
+        "ફક્ત યુરિયા પર આધાર રાખવો"
+      ],
+      "source": "ICAR INM Guide"
+    },
+
+    {
+      "id": "cotton_zinc_deficiency",
+      "crop": "cotton",
+      "problem_type": "micronutrient_deficiency",
+      "priority": 1,
+      "confidence": "high",
+      "symptom_keywords": [
+        "small new leaves",
+        "interveinal yellowing",
+        "stunted growth",
+        "young leaves yellow"
+      ],
+      "symptoms_gujarati": [
+        "નવા પાન નાના રહે",
+        "પાનની નસો વચ્ચે પીળાશ દેખાય",
+        "છોડની વૃદ્ધિ અટકી જાય",
+        "ટોચના પાન પીળા પડે"
+      ],
+      "likely_causes": [
+        "zinc deficiency",
+        "micronutrient imbalance"
+      ],
+      "verification_questions": [
+        "શું નવા પાન વધારે અસરગ્રસ્ત છે?",
+        "નસો લીલી રહી અને વચ્ચે પીળાશ દેખાય છે?"
+      ],
+      "recommendations": [
+        "માઇક્રો ન્યુટ્રિયન્ટ સ્પ્રે કરો",
+        "ઝીંકની ઉપલબ્ધતા માટે જમીન તપાસો",
+        "સંતુલિત ખાતર વ્યવસ્થા રાખો"
+      ],
+      "avoid": [
+        "અજાણતા વધારે યુરિયા આપવું"
+      ],
+      "source": "ICAR INM Guide"
+    },
+
+    {
+      "id": "cotton_water_stress",
+      "crop": "cotton",
+      "problem_type": "water_management",
+      "priority": 2,
+      "confidence": "medium",
+      "symptom_keywords": [
+        "wilting",
+        "leaf curling",
+        "dry leaf edges",
+        "slow growth"
+      ],
+      "symptoms_gujarati": [
+        "પાન લટકી જાય",
+        "પાન વાંકડા થાય",
+        "પાનની કિનારીઓ સૂકાય",
+        "વૃદ્ધિ ધીમી પડે"
+      ],
+      "likely_causes": [
+        "under irrigation",
+        "over irrigation",
+        "poor drainage"
+      ],
+      "verification_questions": [
+        "ખેતરમાં પાણી ભરાઈ રહે છે?",
+        "જમીન લાંબા સમય સુધી સૂકી રહે છે?"
+      ],
+      "recommendations": [
+        "યોગ્ય ડ્રેનેજ રાખો",
+        "નિયમિત અને નિયંત્રિત સિંચાઈ કરો",
+        "પાણી ભરાવા ન દો"
+      ],
+      "avoid": [
+        "દરરોજ વધારે પાણી આપવું"
+      ],
+      "source": "ICAR INM Guide"
+    },
+
+    {
+      "id": "cotton_jassid_attack",
+      "crop": "cotton",
+      "problem_type": "pest_attack",
+      "priority": 2,
+      "confidence": "medium",
+      "symptom_keywords": [
+        "leaf curling",
+        "yellow leaf edges",
+        "small insects under leaves",
+        "hopper burn"
+      ],
+      "symptoms_gujarati": [
+        "પાન વાંકડા થાય",
+        "પાનની ધાર પીળી પડે",
+        "પાનની નીચે નાના જીવાત દેખાય",
+        "પાન સૂકાઈ જાય"
+      ],
+      "likely_causes": [
+        "jassid infestation",
+        "whitefly infestation"
+      ],
+      "verification_questions": [
+        "શું પાનની નીચે નાના લીલા અથવા સફેદ જીવાત દેખાય છે?",
+        "પાનની ધાર પહેલા પીળી પડી પછી સૂકાય છે?"
+      ],
+      "recommendations": [
+        "પાનની નીચે જીવાત તપાસો",
+        "ખેતર સ્વચ્છ રાખો",
+        "જરૂર હોય તો સ્થાનિક કૃષિ નિષ્ણાતની સલાહ લો"
+      ],
+      "avoid": [
+        "અજાણી દવા છાંટવી",
+        "અતિશય કીટનાશક ઉપયોગ"
+      ],
+      "source": "ICAR Cotton Pest Guide"
+    }
+  ]
+}

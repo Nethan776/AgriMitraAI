@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-dotenv
+httpx
+openai
+supabase
+groq
+pypdf
+pdfplumber
+scikit-learn
+numpy
+requests
