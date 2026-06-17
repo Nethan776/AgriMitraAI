@@ -92,9 +92,10 @@ def process_openwa_message(
     user_message: str,
     message_id: str
 ):
+
     try:
 
-        farmer, _ = get_or_create_farmer(chat_id)
+        farmer, is_new = get_or_create_farmer(chat_id)
 
         if is_duplicate_message(
             farmer["id"],
@@ -105,7 +106,7 @@ def process_openwa_message(
 
         history = get_recent_messages(
             farmer["id"],
-            limit=5
+            limit=10
         )
 
         reply = generate_ai_response(
@@ -126,6 +127,12 @@ def process_openwa_message(
             "assistant",
             reply
         )
+
+        update_last_active(
+            farmer["id"]
+        )
+
+        print("AI REPLY:", reply)
 
         send_openwa_reply(
             session_id=session_id,
