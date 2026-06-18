@@ -106,7 +106,7 @@ def process_openwa_message(
 
         history = get_recent_messages(
             farmer["id"],
-            limit=10
+            limit=20
         )
 
         reply = generate_ai_response(
