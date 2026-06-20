@@ -253,7 +253,10 @@ async def download_whatsapp_media(media_payload: dict) -> bytes | None:
         async with httpx.AsyncClient(timeout=30) as client:
             try:
                 # Try with API key header first (OpenWA's own storage)
+                print("DOWNLOAD PAYLOAD:", media_payload)
                 resp = await client.get(media_url, headers={"X-API-Key": OPENWA_API_KEY})
+                print("ATTEMPTING DOWNLOAD:", media_url)
+                print("STATUS:", resp.status_code)
                 if resp.status_code == 200:
                     return resp.content
 
@@ -278,9 +281,15 @@ async def download_whatsapp_media_base64(media_payload: dict) -> str | None:
     If the payload already contains base64, this short-circuits
     straight to it instead of decode-then-re-encode.
     """
+    print("MEDIA PAYLOAD RECEIVED:", media_payload)
+    b64 = media_payload.get("base64")
+    print("HAS BASE64:", bool(b64))
+    media_url = media_payload.get("url")
+    print("MEDIA URL:", media_url)
+
     if not media_payload:
         return None
-
+    
     b64 = media_payload.get("base64")
     if b64:
         if "," in b64 and b64.strip().startswith("data:"):
