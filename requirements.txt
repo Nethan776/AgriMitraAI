@@ -3,10 +3,9 @@ uvicorn
 python-dotenv
 httpx
 openai
-supabase
 groq
+supabase
 pypdf
 pdfplumber
 scikit-learn==1.8.0
 numpy
-requests

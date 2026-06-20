@@ -1,35 +1,37 @@
 # -*- coding: utf-8 -*-
 
-from fastapi import FastAPI, Request, Query, BackgroundTasks
-from fastapi.responses import HTMLResponse, PlainTextResponse
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from dotenv import load_dotenv
+import os
 
-from services.ai_service import generate_ai_response
+from services.ai_service import (
+    generate_ai_response,
+    generate_image_diagnosis,
+    transcribe_audio,
+)
 from services.whatsapp_service import (
     parse_incoming_message,
     send_whatsapp_reply,
     send_typing,
     mark_as_read,
-    download_whatsapp_media
+    download_whatsapp_media,
+    download_whatsapp_media_base64,
 )
 from services.memory_service import (
     get_or_create_farmer,
     get_recent_messages,
     save_message,
     update_last_active,
-    update_farmer_details,
     is_duplicate_message,
-    is_onboarding_complete
+)
+from services.weather_service import (
+    fetch_weather,
+    format_weather_for_farmer,
+    is_weather_query,
 )
 
-from dotenv import load_dotenv
-from services.weather_service import fetch_weather, format_weather_for_farmer, format_weather_for_prompt, is_weather_query
-import os
-import requests
-
 load_dotenv()
-OPENWA_URL = os.getenv("OPENWA_URL")
-OPENWA_API_KEY = os.getenv("OPENWA_API_KEY")
 
 app = FastAPI()
 
@@ -46,145 +48,6 @@ async def health_check():
     }
 
 
-# ─────────────────────────────────────────────
-# Local Test Endpoint (no WhatsApp, no DB)
-# ─────────────────────────────────────────────
-
-class ChatRequest(BaseModel):
-    message: str
-
-def send_openwa_reply(
-    session_id: str,
-    chat_id: str,
-    text: str
-):
-    try:
-
-        url = (
-            f"{OPENWA_URL}"
-            f"/api/sessions/{session_id}/messages/send-text"
-        )
-
-        response = requests.post(
-            url,
-            headers={
-                "X-API-Key": OPENWA_API_KEY,
-                "ngrok-skip-browser-warning": "true",
-                "Content-Type": "application/json"
-            },
-            json={
-                "chatId": chat_id,
-                "text": text
-            },
-            timeout=30
-        )
-
-        print("SEND URL:", url)
-        print("STATUS:", response.status_code)
-        print("BODY:", response.text)
-
-    except Exception as e:
-        print(f"OpenWA Send Error: {e}")
-
-def process_openwa_message(
-    session_id: str,
-    chat_id: str,
-    user_message: str,
-    message_id: str
-):
-
-    try:
-
-        farmer, is_new = get_or_create_farmer(chat_id)
-
-        if is_duplicate_message(
-            farmer["id"],
-            message_id
-        ):
-            print("Duplicate message ignored")
-            return
-
-        history = get_recent_messages(
-            farmer["id"],
-            limit=20
-        )
-
-        reply = generate_ai_response(
-            user_message=user_message,
-            history=history,
-            farmer=farmer
-        )
-
-        save_message(
-            farmer["id"],
-            "user",
-            user_message,
-            whatsapp_message_id=message_id
-        )
-
-        save_message(
-            farmer["id"],
-            "assistant",
-            reply
-        )
-
-        update_last_active(
-            farmer["id"]
-        )
-
-        print("AI REPLY:", reply)
-
-        send_openwa_reply(
-            session_id=session_id,
-            chat_id=chat_id,
-            text=reply
-        )
-
-    except Exception as e:
-        print(f"BACKGROUND ERROR: {e}")        
-
-
-@app.post("/openwa-webhook")
-async def openwa_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks
-):
-
-    payload = await request.json()
-
-    print("OPENWA PAYLOAD:", payload)
-
-    if payload.get("event") != "message.received":
-        return {"status": "ignored"}
-
-    session_id = "b31e3a97-b63d-4cf7-9b66-75a2a1215789"
-
-    data = payload["data"]
-
-    chat_id = data["chatId"]
-    user_message = data["body"]
-    message_id = data["id"]
-
-    background_tasks.add_task(
-    process_openwa_message,
-    session_id,
-    chat_id,
-    user_message,
-    message_id
-)
-
-    return {"status": "ok"}
-
-
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    try:
-        ai_reply = generate_ai_response(request.message, history=[], farmer=None)
-        return {"response": ai_reply}
-    except Exception as e:
-        print(f"CHAT ERROR: {e}")
-        return {"error": str(e)}
-
 @app.get("/privacy")
 async def privacy():
     return HTMLResponse("""
@@ -192,108 +55,48 @@ async def privacy():
     <p>AgriMitra AI collects WhatsApp messages and phone numbers solely to provide agricultural assistance. User data is not sold or shared with third parties. Conversation data may be stored to improve response quality and provide conversational context.</p>
     <p>For questions, contact: your@email.com</p>
     """)
-# ─────────────────────────────────────────────
-# WhatsApp Webhook — Verification (GET)
-# ─────────────────────────────────────────────
-
-@app.get("/webhook")
-async def verify_webhook(
-    hub_mode:         str = Query(alias="hub.mode",         default=None),
-    hub_challenge:    str = Query(alias="hub.challenge",    default=None),
-    hub_verify_token: str = Query(alias="hub.verify_token", default=None)
-):
-    if hub_verify_token == os.getenv("WEBHOOK_VERIFY_TOKEN"):
-        print("✅ Webhook verified by Meta")
-        return PlainTextResponse(hub_challenge)
-
-    print("❌ Webhook verification failed")
-    return PlainTextResponse("Forbidden", status_code=403)
 
 
 # ─────────────────────────────────────────────
-# Onboarding Handler
-# Returns True if onboarding just completed this message
-# Returns False if still in progress
+# OpenWA Webhook — the ONLY message entry point
+#
+# WhatsApp → OpenWA → POST /openwa-webhook → process_farmer_message()
+#                                          → generate_ai_response()
+#                                          → send_whatsapp_reply()
+#                                          → WhatsApp
+#
+# This single route now carries everything that used to be split
+# between the old Meta /webhook (which had all the real logic) and
+# the old /openwa-webhook stub (which had none of it). Onboarding has
+# been intentionally removed per product decision — every farmer is
+# usable immediately on first message.
+#
+# Always returns 200 OK — never let exceptions bubble up, or OpenWA's
+# webhook retry logic (max 3x per its own docs) will redeliver the
+# same message and cause duplicates upstream of our own dedup check.
 # ─────────────────────────────────────────────
 
-async def handle_onboarding(farmer: dict, text: str, phone: str, message_id: str) -> bool:
-    """
-    Handles one onboarding step per call.
-    Returns True if onboarding just finished (taluka step done).
-    Returns False if still collecting details.
-    """
-    step = farmer.get("onboarding_step", "ask_name")
-    text = text.strip()
-
-    # ── Step 1: received name, ask village ──
-    if step == "ask_name":
-        update_farmer_details(farmer["id"], {"name":text,"onboarding_step": "ask_village"})
-        save_message(farmer["id"], "user",      text, whatsapp_message_id=message_id)
-        save_message(farmer["id"], "assistant", "તમારું ગામ કયું છે?")
-        await send_whatsapp_reply(phone, "તમારું ગામ કયું છે?")
-        return False
-
-    # ── Step 2: received village, ask taluka ──
-    elif step == "ask_village":
-        update_farmer_details(farmer["id"], {
-            "village":         text,
-            "onboarding_step": "ask_taluka"
-        })
-        save_message(farmer["id"], "user",      text, whatsapp_message_id=message_id)
-        save_message(farmer["id"], "assistant", "તમારો તાલુકો કયો છે?")
-        await send_whatsapp_reply(phone, "તમારો તાલુકો કયો છે?")
-        return False
-
-    # ── Step 3: received taluka — onboarding complete ──
-    elif step == "ask_taluka":
-        update_farmer_details(farmer["id"], {
-            "taluka":          text,
-            "onboarding_step": "done"
-        })
-        save_message(farmer["id"], "user", text, whatsapp_message_id=message_id)
-
-        name = farmer.get("name", "ખેડૂત")
-        welcome = (
-            f"આવકારો, {name}ભાઈ! 🌾\n\n"
-            "હું કૃષિ મિત્ર છું — તમારો AI ખેતી સહાયક.\n\n"
-            "હવે તમારી ખેતી સમસ્યા જણાવો — હું મદદ કરીશ! 🙏"
-        )
-        save_message(farmer["id"], "assistant", welcome)
-        await send_whatsapp_reply(phone, welcome)
-        return True   # ← onboarding just finished, do NOT run AI after this
-
-    return False
-
-
-# ─────────────────────────────────────────────
-# WhatsApp Webhook — Incoming Messages (POST)
-# ─────────────────────────────────────────────
-
-@app.post("/webhook")
-async def receive_message(request: Request):
-    """
-    All farmer messages arrive here from WhatsApp Cloud API.
-    Always returns 200 OK — never let exceptions bubble up or
-    WhatsApp will retry endlessly and cause more duplicates.
-    """
+@app.post("/openwa-webhook")
+async def openwa_webhook(request: Request):
     try:
-        body   = await request.json()
-        parsed = parse_incoming_message(body)
+        payload = await request.json()
+        parsed  = parse_incoming_message(payload)
 
         if not parsed:
             return {"status": "ok"}
 
-        phone      = parsed["phone"]
-        msg_type   = parsed["type"]
-        text       = parsed["text"]
-        media_id   = parsed["media_id"]
-        message_id = parsed["message_id"]
+        phone       = parsed["phone"]
+        msg_type    = parsed["type"]
+        text        = parsed["text"]
+        media       = parsed["media_id"]      # dict {url, base64, mimetype} or None, for image/audio/document
+        message_id  = parsed["message_id"]
+        session_id  = payload.get("sessionId")
 
         print(f"\n📩 [{msg_type}] from {phone}: {text or '(media)'}")
 
         # ── GET OR CREATE FARMER ──────────────────────────────────────────
         # Must load farmer first so deduplication is scoped per farmer.
-        # Two different farmers can have the same WhatsApp message ID.
+        # Two different farmers can have the same message ID.
         farmer, is_new = get_or_create_farmer(phone)
         update_last_active(farmer["id"])
 
@@ -302,44 +105,60 @@ async def receive_message(request: Request):
             print(f"⚠️  Duplicate ignored: {message_id}")
             return {"status": "ok"}
 
-        # ── MARK AS READ (blue ticks) ─────────────────────────────────────
-        await mark_as_read(message_id)
+        # ── MARK AS READ (blue ticks, best-effort) ────────────────────────
+        await mark_as_read(message_id, session_id=session_id)
 
-        # ── BRAND NEW FARMER — send greeting, ask for name ────────────────
+        # ── BRAND NEW FARMER — short welcome, no onboarding questions ─────
         if is_new:
-            save_message(farmer["id"], "user", text or "(media)", whatsapp_message_id=message_id)
             greeting = (
                 "નમસ્તે! 🌾 કૃષિ મિત્રમાં આપનું સ્વાગત છે!\n\n"
-                "શરૂ કરતાં પહેલાં થોડી માહિતી આપો.\n\n"
-                "તમારું નામ શું છે?"
+                "તમારી ખેતી સમસ્યા જણાવો, ફોટો મોકલો, અથવા અવાજ સંદેશ મોકલો — "
+                "હું મદદ કરીશ! 🙏"
             )
+            save_message(farmer["id"], "user",      text or "(media)", whatsapp_message_id=message_id)
             save_message(farmer["id"], "assistant", greeting)
-            await send_whatsapp_reply(phone, greeting)
+            await send_whatsapp_reply(phone, greeting, session_id=session_id)
             return {"status": "ok"}
 
-        # ── ONBOARDING IN PROGRESS ────────────────────────────────────────
-        if not is_onboarding_complete(farmer):
-            just_finished = await handle_onboarding(farmer, text, phone, message_id)
-            # Whether still in progress or just finished — stop here.
-            # Never fall through to AI during or right after onboarding.
-            return {"status": "ok"}
-
-        # ── NORMAL FLOW — onboarding done ─────────────────────────────────
-
-        # Handle image with no caption
+        # ── IMAGE — send to vision model for diagnosis ─────────────────────
         if msg_type == "image":
-            if not text:
+            if not media:
                 await send_whatsapp_reply(
                     phone,
-                    "🌾 ફોટો મળ્યો!\n\nકૃપા કરીને ટેક્સ્ટમાં જણાવો — પાકમાં શી સમસ્યા છે?\n"
-                    "દા.ત. 'પાન પીળા થઈ ગયા' અથવા 'જીવડાં દેખાય છે'."
+                    "🌾 ફોટો મળ્યો, પણ ડાઉનલોડ ન થઈ શક્યો. કૃપા કરીને ફરી મોકલો.",
+                    session_id=session_id
                 )
                 return {"status": "ok"}
 
-        # Handle voice note
-        elif msg_type == "audio" and media_id:
+            print("📷 Downloading image for diagnosis...")
+            image_base64 = await download_whatsapp_media_base64(media)
+
+            if not image_base64:
+                await send_whatsapp_reply(
+                    phone,
+                    "🌾 ફોટો ડાઉનલોડ ન થઈ શક્યો. કૃપા કરીને ફરી મોકલો અથવા "
+                    "સમસ્યા ટેક્સ્ટમાં લખો.",
+                    session_id=session_id
+                )
+                return {"status": "ok"}
+
+            await send_typing(phone, session_id=session_id)
+
+            diagnosis = generate_image_diagnosis(
+                image_base64=image_base64,
+                caption=text,
+                farmer=farmer
+            )
+
+            save_message(farmer["id"], "user",      text or "(ફોટો મોકલ્યો)", whatsapp_message_id=message_id)
+            save_message(farmer["id"], "assistant", diagnosis)
+            await send_whatsapp_reply(phone, diagnosis, session_id=session_id)
+            return {"status": "ok"}
+
+        # ── VOICE NOTE — transcribe then fall through to normal AI flow ───
+        elif msg_type == "audio" and media:
             print("🎤 Downloading voice note...")
-            audio_bytes = await download_whatsapp_media(media_id)
+            audio_bytes = await download_whatsapp_media(media)
 
             if audio_bytes:
                 transcribed = transcribe_audio(audio_bytes)
@@ -350,38 +169,43 @@ async def receive_message(request: Request):
                     await send_whatsapp_reply(
                         phone,
                         "અત્યારે અવાજ સમજવાની સુવિધા ઉપલબ્ધ નથી.\n"
-                        "કૃપા કરીને ટેક્સ્ટ (ટાઇપ) માં સમસ્યા જણાવો."
+                        "કૃપા કરીને ટેક્સ્ટ (ટાઇપ) માં સમસ્યા જણાવો.",
+                        session_id=session_id
                     )
                     return {"status": "ok"}
             else:
-                await send_whatsapp_reply(phone, "અવાજ સંદેશ ડાઉનલોડ ન થઈ શક્યો. ફરી પ્રયાસ કરો.")
+                await send_whatsapp_reply(
+                    phone,
+                    "અવાજ સંદેશ ડાઉનલોડ ન થઈ શક્યો. ફરી પ્રયાસ કરો.",
+                    session_id=session_id
+                )
                 return {"status": "ok"}
 
-        # Guard: empty text
+        # ── GUARD: empty text (e.g. sticker, reaction with no body) ───────
         if not text or not text.strip():
             await send_whatsapp_reply(
                 phone,
-                "નમસ્તે! 🌾 તમારી ખેતી સમસ્યા ટેક્સ્ટમાં લખો — હું મદદ કરીશ."
+                "નમસ્તે! 🌾 તમારી ખેતી સમસ્યા ટેક્સ્ટમાં લખો — હું મદદ કરીશ.",
+                session_id=session_id
             )
             return {"status": "ok"}
 
-        # ── FETCH WEATHER FOR FARMER'S TALUKA ────────────────────────────
+        # ── WEATHER ────────────────────────────────────────────────────────
         taluka  = farmer.get("taluka") or farmer.get("village") or "Bharuch"
         weather = await fetch_weather(taluka)
 
         # If farmer is directly asking about weather — reply and stop
         if is_weather_query(text):
             weather_reply = format_weather_for_farmer(weather)
-            save_message(farmer["id"], "user",      text,         whatsapp_message_id=message_id)
+            save_message(farmer["id"], "user",      text,          whatsapp_message_id=message_id)
             save_message(farmer["id"], "assistant", weather_reply)
-            await send_whatsapp_reply(phone, weather_reply)
+            await send_whatsapp_reply(phone, weather_reply, session_id=session_id)
             return {"status": "ok"}
 
-        # ── LOAD HISTORY + GENERATE AI RESPONSE ──────────────────────────
+        # ── LOAD HISTORY + GENERATE AI RESPONSE ───────────────────────────
         history = get_recent_messages(farmer["id"], limit=5)
 
-        # Show typing indicator while AI is thinking
-        await send_typing(phone)
+        await send_typing(phone, session_id=session_id)
 
         reply = generate_ai_response(
             user_message=text,
@@ -390,23 +214,16 @@ async def receive_message(request: Request):
             weather=weather
         )
 
-        # ── SAVE + SEND ───────────────────────────────────────────────────
+        # ── SAVE + SEND ──────────────────────────────────────────────────
         save_message(farmer["id"], "user",      text,  whatsapp_message_id=message_id)
         save_message(farmer["id"], "assistant", reply)
-        await send_whatsapp_reply(phone, reply)
+        await send_whatsapp_reply(phone, reply, session_id=session_id)
 
         return {"status": "ok"}
 
     except Exception as e:
-        print(f"\n❌ WEBHOOK ERROR: {e}\n")
+        print(f"\n❌ OPENWA WEBHOOK ERROR: {e}\n")
         return {"status": "ok"}
-
-
-# ─────────────────────────────────────────────
-# Voice Transcription via Groq Whisper API
-# ─────────────────────────────────────────────
-
-
 
 
 # uvicorn app:app --reload

@@ -1,156 +1,229 @@
-import httpx
+# -*- coding: utf-8 -*-
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from dotenv import load_dotenv
 import os
 
+from services.ai_service import (
+    generate_ai_response,
+    generate_image_diagnosis,
+    transcribe_audio,
+)
+from services.whatsapp_service import (
+    parse_incoming_message,
+    send_whatsapp_reply,
+    send_typing,
+    mark_as_read,
+    download_whatsapp_media,
+    download_whatsapp_media_base64,
+)
+from services.memory_service import (
+    get_or_create_farmer,
+    get_recent_messages,
+    save_message,
+    update_last_active,
+    is_duplicate_message,
+)
+from services.weather_service import (
+    fetch_weather,
+    format_weather_for_farmer,
+    is_weather_query,
+)
 
-def parse_incoming_message(body: dict) -> dict | None:
-    """
-    Extract useful fields from WhatsApp's webhook payload.
-    Returns None for status updates, reactions, and non-message events.
+load_dotenv()
 
-    Key addition: returns whatsapp_message_id so we can deduplicate.
-    WhatsApp retries webhooks if it doesn't get a fast 200 OK, which
-    causes the same message to arrive 2-3 times. We block duplicates
-    in memory_service using this ID.
-    """
+app = FastAPI()
+
+
+# ─────────────────────────────────────────────
+# Health Check
+# ─────────────────────────────────────────────
+
+@app.get("/")
+async def health_check():
+    return {
+        "status": "running",
+        "app":    "Gujarati Farm AI Assistant 🌾"
+    }
+
+
+@app.get("/privacy")
+async def privacy():
+    return HTMLResponse("""
+    <h1>Privacy Policy</h1>
+    <p>AgriMitra AI collects WhatsApp messages and phone numbers solely to provide agricultural assistance. User data is not sold or shared with third parties. Conversation data may be stored to improve response quality and provide conversational context.</p>
+    <p>For questions, contact: your@email.com</p>
+    """)
+
+
+# ─────────────────────────────────────────────
+# OpenWA Webhook — the ONLY message entry point
+#
+# WhatsApp → OpenWA → POST /openwa-webhook → process_farmer_message()
+#                                          → generate_ai_response()
+#                                          → send_whatsapp_reply()
+#                                          → WhatsApp
+#
+# This single route now carries everything that used to be split
+# between the old Meta /webhook (which had all the real logic) and
+# the old /openwa-webhook stub (which had none of it). Onboarding has
+# been intentionally removed per product decision — every farmer is
+# usable immediately on first message.
+#
+# Always returns 200 OK — never let exceptions bubble up, or OpenWA's
+# webhook retry logic (max 3x per its own docs) will redeliver the
+# same message and cause duplicates upstream of our own dedup check.
+# ─────────────────────────────────────────────
+
+@app.post("/openwa-webhook")
+async def openwa_webhook(request: Request):
     try:
-        entry = body["entry"][0]["changes"][0]["value"]
+        payload = await request.json()
+        parsed  = parse_incoming_message(payload)
 
-        # Status webhooks (delivered, read, failed) have no "messages" key
-        if "messages" not in entry:
-            return None
+        if not parsed:
+            return {"status": "ok"}
 
-        message  = entry["messages"][0]
-        phone    = message["from"]
-        msg_type = message["type"]
-        msg_id   = message.get("id")   # unique WhatsApp message ID
+        phone       = parsed["phone"]
+        msg_type    = parsed["type"]
+        text        = parsed["text"]
+        media       = parsed["media_id"]      # dict {url, base64, mimetype} or None, for image/audio/document
+        message_id  = parsed["message_id"]
+        session_id  = payload.get("sessionId")
 
-        text     = None
-        media_id = None
+        print(f"\n📩 [{msg_type}] from {phone}: {text or '(media)'}")
 
-        if msg_type == "text":
-            text = message["text"]["body"]
+        # ── GET OR CREATE FARMER ──────────────────────────────────────────
+        # Must load farmer first so deduplication is scoped per farmer.
+        # Two different farmers can have the same message ID.
+        farmer, is_new = get_or_create_farmer(phone)
+        update_last_active(farmer["id"])
 
-        elif msg_type == "image":
-            text     = message.get("image", {}).get("caption", "")
-            media_id = message["image"]["id"]
+        # ── DEDUPLICATION (per farmer) ────────────────────────────────────
+        if is_duplicate_message(farmer["id"], message_id):
+            print(f"⚠️  Duplicate ignored: {message_id}")
+            return {"status": "ok"}
 
-        elif msg_type == "audio":
-            text     = ""
-            media_id = message["audio"]["id"]
+        # ── MARK AS READ (blue ticks, best-effort) ────────────────────────
+        await mark_as_read(message_id, session_id=session_id)
 
-        elif msg_type == "document":
-            text     = message.get("document", {}).get("caption", "")
-            media_id = message["document"]["id"]
+        # ── BRAND NEW FARMER — short welcome, no onboarding questions ─────
+        if is_new:
+            greeting = (
+                "નમસ્તે! 🌾 કૃષિ મિત્રમાં આપનું સ્વાગત છે!\n\n"
+                "તમારી ખેતી સમસ્યા જણાવો, ફોટો મોકલો, અથવા અવાજ સંદેશ મોકલો — "
+                "હું મદદ કરીશ! 🙏"
+            )
+            save_message(farmer["id"], "user",      text or "(media)", whatsapp_message_id=message_id)
+            save_message(farmer["id"], "assistant", greeting)
+            await send_whatsapp_reply(phone, greeting, session_id=session_id)
+            return {"status": "ok"}
 
-        else:
-            # Reactions, stickers, location, etc. — ignore
-            return None
+        # ── IMAGE — send to vision model for diagnosis ─────────────────────
+        if msg_type == "image":
+            if not media:
+                await send_whatsapp_reply(
+                    phone,
+                    "🌾 ફોટો મળ્યો, પણ ડાઉનલોડ ન થઈ શક્યો. કૃપા કરીને ફરી મોકલો.",
+                    session_id=session_id
+                )
+                return {"status": "ok"}
 
-        return {
-            "phone":      phone,
-            "type":       msg_type,
-            "text":       text or "",
-            "media_id":   media_id,
-            "message_id": msg_id       # ← used for deduplication
-        }
+            print("📷 Downloading image for diagnosis...")
+            image_base64 = await download_whatsapp_media_base64(media)
 
-    except (KeyError, IndexError, TypeError):
-        return None
+            if not image_base64:
+                await send_whatsapp_reply(
+                    phone,
+                    "🌾 ફોટો ડાઉનલોડ ન થઈ શક્યો. કૃપા કરીને ફરી મોકલો અથવા "
+                    "સમસ્યા ટેક્સ્ટમાં લખો.",
+                    session_id=session_id
+                )
+                return {"status": "ok"}
 
+            await send_typing(phone, session_id=session_id)
 
+            diagnosis = generate_image_diagnosis(
+                image_base64=image_base64,
+                caption=text,
+                farmer=farmer
+            )
 
-async def mark_as_read(message_id: str):
-    """
-    Marks the farmer's message as read (double blue tick).
-    Call this immediately when a message arrives.
-    """
-    url = f"https://graph.facebook.com/v19.0/{os.getenv('WHATSAPP_PHONE_ID')}/messages"
-    headers = {
-        "Authorization": f"Bearer {os.getenv('WHATSAPP_TOKEN')}",
-        "Content-Type":  "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "status":            "read",
-        "message_id":        message_id
-    }
-    async with httpx.AsyncClient() as client:
-        await client.post(url, json=payload, headers=headers)
+            save_message(farmer["id"], "user",      text or "(ફોટો મોકલ્યો)", whatsapp_message_id=message_id)
+            save_message(farmer["id"], "assistant", diagnosis)
+            await send_whatsapp_reply(phone, diagnosis, session_id=session_id)
+            return {"status": "ok"}
 
+        # ── VOICE NOTE — transcribe then fall through to normal AI flow ───
+        elif msg_type == "audio" and media:
+            print("🎤 Downloading voice note...")
+            audio_bytes = await download_whatsapp_media(media)
 
-async def send_typing(phone: str):
-    """
-    Shows the typing... indicator in the farmer's chat for ~25 seconds.
-    Call this right before the AI generates a response.
-    """
-    url = f"https://graph.facebook.com/v19.0/{os.getenv('WHATSAPP_PHONE_ID')}/messages"
-    headers = {
-        "Authorization": f"Bearer {os.getenv('WHATSAPP_TOKEN')}",
-        "Content-Type":  "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "recipient_type":    "individual",
-        "to":                phone,
-        "type":              "reaction",
-        "typing":            {"status": "typing"}
-    }
-    async with httpx.AsyncClient() as client:
-        await client.post(url, json=payload, headers=headers)
+            if audio_bytes:
+                transcribed = transcribe_audio(audio_bytes)
+                if transcribed:
+                    text = transcribed
+                    print(f"📝 Transcribed: {text}")
+                else:
+                    await send_whatsapp_reply(
+                        phone,
+                        "અત્યારે અવાજ સમજવાની સુવિધા ઉપલબ્ધ નથી.\n"
+                        "કૃપા કરીને ટેક્સ્ટ (ટાઇપ) માં સમસ્યા જણાવો.",
+                        session_id=session_id
+                    )
+                    return {"status": "ok"}
+            else:
+                await send_whatsapp_reply(
+                    phone,
+                    "અવાજ સંદેશ ડાઉનલોડ ન થઈ શક્યો. ફરી પ્રયાસ કરો.",
+                    session_id=session_id
+                )
+                return {"status": "ok"}
 
+        # ── GUARD: empty text (e.g. sticker, reaction with no body) ───────
+        if not text or not text.strip():
+            await send_whatsapp_reply(
+                phone,
+                "નમસ્તે! 🌾 તમારી ખેતી સમસ્યા ટેક્સ્ટમાં લખો — હું મદદ કરીશ.",
+                session_id=session_id
+            )
+            return {"status": "ok"}
 
-async def send_whatsapp_reply(phone: str, message: str):
-    """Send a plain text reply to a farmer on WhatsApp."""
+        # ── WEATHER ────────────────────────────────────────────────────────
+        taluka  = farmer.get("taluka") or farmer.get("village") or "Bharuch"
+        weather = await fetch_weather(taluka)
 
-    url = f"https://graph.facebook.com/v19.0/{os.getenv('WHATSAPP_PHONE_ID')}/messages"
+        # If farmer is directly asking about weather — reply and stop
+        if is_weather_query(text):
+            weather_reply = format_weather_for_farmer(weather)
+            save_message(farmer["id"], "user",      text,          whatsapp_message_id=message_id)
+            save_message(farmer["id"], "assistant", weather_reply)
+            await send_whatsapp_reply(phone, weather_reply, session_id=session_id)
+            return {"status": "ok"}
 
-    headers = {
-        "Authorization": f"Bearer {os.getenv('WHATSAPP_TOKEN')}",
-        "Content-Type":  "application/json"
-    }
+        # ── LOAD HISTORY + GENERATE AI RESPONSE ───────────────────────────
+        history = get_recent_messages(farmer["id"], limit=5)
 
-    payload = {
-        "messaging_product": "whatsapp",
-        "to":   phone,
-        "type": "text",
-        "text": {"body": message[:4096]}   # WhatsApp hard limit
-    }
+        await send_typing(phone, session_id=session_id)
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, headers=headers)
-
-        if response.status_code == 200:
-            print(f"✅ Reply sent to {phone}")
-        else:
-            print(f"❌ WhatsApp send failed [{response.status_code}]: {response.text}")
-
-
-async def download_whatsapp_media(media_id: str) -> bytes | None:
-    """
-    Download a media file (image / audio) from WhatsApp servers.
-    Step 1: resolve media_id → download URL
-    Step 2: download the file bytes
-    """
-    headers = {"Authorization": f"Bearer {os.getenv('WHATSAPP_TOKEN')}"}
-
-    async with httpx.AsyncClient() as client:
-
-        # Step 1 — get download URL from media ID
-        meta = await client.get(
-            f"https://graph.facebook.com/v19.0/{media_id}",
-            headers=headers
+        reply = generate_ai_response(
+            user_message=text,
+            history=history,
+            farmer=farmer,
+            weather=weather
         )
-        if meta.status_code != 200:
-            print(f"❌ Could not resolve media ID: {media_id}")
-            return None
 
-        media_url = meta.json().get("url")
-        if not media_url:
-            return None
+        # ── SAVE + SEND ──────────────────────────────────────────────────
+        save_message(farmer["id"], "user",      text,  whatsapp_message_id=message_id)
+        save_message(farmer["id"], "assistant", reply)
+        await send_whatsapp_reply(phone, reply, session_id=session_id)
 
-        # Step 2 — download file
-        file_resp = await client.get(media_url, headers=headers)
-        if file_resp.status_code == 200:
-            return file_resp.content
+        return {"status": "ok"}
 
-    return None
+    except Exception as e:
+        print(f"\n❌ OPENWA WEBHOOK ERROR: {e}\n")
+        return {"status": "ok"}
+
+
+# uvicorn app:app --reload

@@ -4,6 +4,13 @@ from datetime import datetime, timezone
 
 # ─────────────────────────────────────────────
 # Farmer
+#
+# Onboarding removed: no more onboarding_step / ask_name flow.
+# A new farmer row is created with name/village/taluka left NULL.
+# Nothing downstream requires these to be set — ai_service.py already
+# falls back to "અજ્ઞાત" (unknown) when missing, and weather_service.py
+# falls back to a default taluka. So the bot is fully usable from the
+# very first message with zero setup friction.
 # ─────────────────────────────────────────────
 
 def get_or_create_farmer(phone: str) -> tuple[dict, bool]:
@@ -17,8 +24,7 @@ def get_or_create_farmer(phone: str) -> tuple[dict, bool]:
 
     inserted = supabase.table("farmers") \
         .insert({
-            "whatsapp_number": phone,
-            "onboarding_step": "ask_name"
+            "whatsapp_number": phone
         }) \
         .execute()
 
@@ -27,6 +33,11 @@ def get_or_create_farmer(phone: str) -> tuple[dict, bool]:
 
 
 def update_farmer_details(farmer_id: str, fields: dict):
+    """
+    Still used if you ever want to update a farmer's name/village/taluka
+    later (e.g. from a future "update my profile" command), even though
+    the onboarding flow that used to call this on every new farmer is gone.
+    """
     supabase.table("farmers") \
         .update(fields) \
         .eq("id", farmer_id) \
@@ -38,10 +49,6 @@ def update_last_active(farmer_id: str):
         .update({"last_active": datetime.now(timezone.utc).isoformat()}) \
         .eq("id", farmer_id) \
         .execute()
-
-
-def is_onboarding_complete(farmer: dict) -> bool:
-    return farmer.get("onboarding_step") == "done"
 
 
 # ─────────────────────────────────────────────

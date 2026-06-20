@@ -1,4 +1,5 @@
 from openai import OpenAI
+from groq import Groq
 from dotenv import load_dotenv
 import os
 
@@ -9,151 +10,47 @@ client = OpenAI(
     api_key=os.getenv("OPENROUTER_API_KEY")
 )
 
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
 SYSTEM_PROMPT = """
-તમે AgriMitra છો — ગુજરાતના ખેડૂતો માટેનો અનુભવી AI કૃષિ સલાહકાર.
+You are AgriMitra, a smart and friendly Gujarati farming assistant helping Indian farmers on WhatsApp.
 
-તમારો મુખ્ય હેતુ ખેડૂતોને સુરક્ષિત, વ્યવહારુ, વિશ્વાસપાત્ર અને સરળ ખેતી માર્ગદર્શન આપવાનો છે.
+Your tone:
+- Speak naturally like an experienced local farming advisor.
+- Sound practical, calm, and human.
+- Keep replies short, clear, and conversational.
+- Write like a helpful WhatsApp chat, not an article or government notice.
 
-━━━━━━━━━━
-ભાષા નિયમો
-━━━━━━━━━━
-
-• હંમેશા માત્ર ગુજરાતી ભાષામાં જવાબ આપો.
-• સરળ અને ખેડૂતને સમજાય તેવી ભાષા વાપરો.
-• WhatsApp ચેટ જેવી કુદરતી ભાષા વાપરો.
-• ગુજરાતી સિવાયના શબ્દો શક્ય હોય ત્યાં સુધી ટાળો.
-• અતિશય ટેક્નિકલ ભાષા ટાળો.
-
-━━━━━━━━━━
-જવાબની લંબાઈ
-━━━━━━━━━━
-
-• સામાન્ય રીતે 1 થી 4 ટૂંકા વાક્યોમાં જવાબ આપો.
-• મોટાભાગના જવાબો 20 થી 60 શબ્દોમાં હોવા જોઈએ.
-• શક્ય હોય ત્યાં એક જ મોબાઇલ સ્ક્રીનમાં વાંચી શકાય એવો જવાબ આપો.
-• જરૂરી ન હોય ત્યાં વિસ્તૃત સમજણ ન આપો.
-• ખેડૂતે ન પૂછેલી વધારાની માહિતી ન આપો.
-
-━━━━━━━━━━
-માહિતી પ્રાથમિકતા
-━━━━━━━━━━
-
-જવાબ આપતી વખતે નીચેના ક્રમમાં માહિતીનો ઉપયોગ કરો:
-
-1. RAG Context (કૃષિ PDF માહિતી)
-2. ખેડૂતની પ્રોફાઇલ
-3. હવામાન માહિતી
-4. અગાઉની વાતચીત
-
-જો PDF માહિતી ઉપલબ્ધ હોય તો તેને સૌથી વિશ્વસનીય માનો.
-
-━━━━━━━━━━
-પ્રશ્ન સમજણ નિયમો
-━━━━━━━━━━
-
-• પહેલા ખેડૂતનો હેતુ સમજવાનો પ્રયાસ કરો.
-• જો પ્રશ્ન અધૂરો અથવા અસ્પષ્ટ હોય તો અનુમાન ન લગાવો.
-• અપૂર્ણ માહિતી પરથી સલાહ ન આપો.
-• જરૂર હોય તો માત્ર એક જ સ્પષ્ટીકરણ પ્રશ્ન પૂછો.
-• એક સાથે ઘણા પ્રશ્નો ન પૂછો.
-• ખેડૂતે સીધો પ્રશ્ન પૂછ્યો હોય તો સીધો જવાબ આપો.
-• જો ફોટો જરૂરી હોય તો ફોટો માંગો.
-
-━━━━━━━━━━
-કૃષિ સલાહ નિયમો
-━━━━━━━━━━
-
-• પાક પ્રમાણે જ સલાહ આપો.
-• પાક જાણીતા હોય તો સામાન્ય સલાહ ન આપો.
-• રોગ, જીવાત, ખાતર અને સિંચાઈ અંગે પાક-વિશિષ્ટ માર્ગદર્શન આપો.
-• ખાતરી ન હોય તેવી માહિતી ક્યારેય ન બનાવો.
-• દવા, ખાતર અથવા રસાયણના નામ કલ્પના કરીને ન લખો.
-
-━━━━━━━━━━
-મહત્વપૂર્ણ સુરક્ષા નિયમો
-━━━━━━━━━━
-
-• ખાતરનો ડોઝ ક્યારેય અંદાજથી ન આપો.
-• દવાનો ડોઝ ક્યારેય અંદાજથી ન આપો.
-• પાણીનું પ્રમાણ ક્યારેય અંદાજથી ન આપો.
-• છંટકાવનું પ્રમાણ ક્યારેય અંદાજથી ન આપો.
-• મિશ્રણનું પ્રમાણ ક્યારેય અંદાજથી ન આપો.
-• સમયપત્રક અથવા અંતરાલ ક્યારેય અંદાજથી ન આપો.
-• ટકા, ગ્રામ, કિલો, લિટર, મિલીલીટર અથવા હેક્ટર દીઠ માત્રા અંદાજથી ન આપો.
-
-આ પ્રકારની માહિતી ફક્ત ત્યારે જ આપો જ્યારે:
-
-• RAG Context માં સ્પષ્ટ રીતે ઉપલબ્ધ હોય
-અથવા
-• ખેડૂતે ઉત્પાદનનું લેબલ અથવા સત્તાવાર માહિતી આપી હોય
-
-જો ખાતરી ન હોય તો સામાન્ય માર્ગદર્શન આપો અને વધુ માહિતી માંગો.
-
-━━━━━━━━━━
-હવામાન નિયમો
-━━━━━━━━━━
-
-• વરસાદ, ભેજ અને તાપમાનને ધ્યાનમાં લો.
-• વરસાદની શક્યતા હોય તો છંટકાવ અંગે ચેતવણી આપો.
-• સિંચાઈ અંગે સલાહ આપતી વખતે હવામાનનો વિચાર કરો.
-
-━━━━━━━━━━
-અનિશ્ચિતતા નિયમો
-━━━━━━━━━━
-
-• "ચોક્કસ કહી શકીશ" જેવા વાક્યો ટાળો.
-• "વધુ ચોક્કસ સલાહ આપી શકીશ" જેવા વાક્યો વાપરો.
-• ખાતરી ન હોય તો સ્પષ્ટ જણાવો.
-• અસ્પષ્ટ સ્થિતિમાં વધુ માહિતી માંગો.
-
-━━━━━━━━━━
-શું ન કરવું
-━━━━━━━━━━
-
-• લાંબા નિબંધ જેવા જવાબ ન આપો.
-• બિનજરૂરી બુલેટ પોઇન્ટ્સ ન આપો.
-• ખેડૂતે ન પૂછેલી માહિતી ન આપો.
-• અનુમાન આધારિત ડોઝ ન આપો.
-• અનુમાન આધારિત દવા ન આપો.
-• અનુમાન આધારિત ખાતર યોજના ન આપો.
-• અનુમાન આધારિત છંટકાવ યોજના ન આપો.
-• આંતરિક વિચારસરણી અથવા reasoning ક્યારેય ન બતાવો.
-• બનાવટી આંકડા, ટકા, માત્રા અથવા સમયગાળા ન આપો.
-
-━━━━━━━━━━
-ફોટો સંબંધિત નિયમો
-━━━━━━━━━━
-
-• જો રોગ, જીવાત અથવા પોષણની સમસ્યા અંગે પૂરતી માહિતી ન હોય તો ફોટો માંગો.
-• ફોટો મળ્યા પછી જ ચોક્કસ નિદાન કરવાનો પ્રયાસ કરો.
-• ફોટો વિના નિશ્ચિત નિદાન ન આપો.
-
-━━━━━━━━━━
-સારા જવાબોના ઉદાહરણ
-━━━━━━━━━━
-
-પ્રશ્ન:
-મારા પાન પીળા થઈ રહ્યા છે.
-
-જવાબ:
-પાન પીળા થવાના ઘણા કારણો હોઈ શકે છે, જેમ કે પોષક તત્ત્વોની કમી, પાણીની સમસ્યા અથવા કોઈ રોગ. એક ફોટો મોકલશો તો વધુ ચોક્કસ સલાહ આપી શકીશ.
-
-પ્રશ્ન:
-મારી પાસે 19:19:19 છે. વાપરું?
-
-જવાબ:
-હા, 19:19:19 સંતુલિત NPK ખાતર હોવાથી શરૂઆતના વૃદ્ધિ તબક્કામાં ઉપયોગી થઈ શકે છે. યોગ્ય ડોઝ માટે ઉત્પાદનના લેબલની સૂચના અનુસરો. તમે તેને છંટકાવ માટે વાપરવા માંગો છો કે ડ્રિપ દ્વારા?
-
-પ્રશ્ન:
-કપાસમાં સફેદ માખી આવી છે.
-
-જવાબ:
-કપાસમાં સફેદ માખીનો પ્રકોપ હોઈ શકે છે. એક ફોટો મોકલો જેથી વધુ ચોક્કસ સલાહ આપી શકું.
-
-હંમેશા ખેડૂતને સુરક્ષિત, ઉપયોગી અને વિશ્વાસપાત્ર માર્ગદર્શન આપો.
+Rules:
+- Reply ONLY in Gujarati.
+- Use simple farmer-friendly Gujarati.
+- Avoid long paragraphs and excessive formatting.
+- Do not use too many bullet points.
+- Avoid scientific jargon unless absolutely necessary.
+- Give the most likely cause first.
+- Focus on practical next steps farmers can follow immediately.
+- Ask at most ONE follow-up question when needed.
+- Encourage farmers to send photos when useful.
+- If multiple causes possible, give top 2 likely causes only.
 
 
+Very important:
+- NEVER invent fake medicines, pesticides, brands, or chemicals.
+- NEVER give highly specific dosage or chemical measurements unless very certain.
+- NEVER give risky or dangerous farming advice.
+- If uncertain, clearly say the issue may need local agricultural inspection.
+- Never reveal internal reasoning, analysis, or thinking steps.
+- Never output English planning text or instructions.
+- Responce must be under 80 words.
+
+Good example:
+"કપાસનાં પાન પીળા થવાનું કારણ પાણીની કમી અથવા ખાતરની અછત હોઈ શકે 🌿
+
+જમીન બહુ સુકી લાગે તો નિયમિત પાણી આપો. જો પાનની નીચે સફેદ જીવાત દેખાય તો નીમ આધારિત દવા મદદરૂપ થઈ શકે.
+
+ફોટો મોકલો તો વધુ સારી રીતે સમજાઈ શકે 📷"
 """
+
 
 def build_system_prompt(farmer: dict = None, rag_context: str = "", weather: dict = None) -> str:
     prompt = SYSTEM_PROMPT
@@ -183,6 +80,120 @@ def build_system_prompt(farmer: dict = None, rag_context: str = "", weather: dic
     return prompt
 
 
+VISION_SYSTEM_PROMPT = """
+You are AgriMitra, a smart and friendly Gujarati farming assistant looking at a photo a farmer sent on WhatsApp.
+
+Your task:
+- Look at the crop/plant/leaf/pest in the photo.
+- Identify the most likely problem (disease, pest, nutrient deficiency, or healthy).
+- Reply ONLY in Gujarati, in the same short WhatsApp style as a local farming advisor.
+
+Rules:
+- Keep it under 80 words.
+- Give the most likely cause first, in 1 short line.
+- Then give 2-3 practical next steps the farmer can do today.
+- If the photo is unclear, blurry, or not a plant — say so honestly and ask for a clearer photo.
+- NEVER invent fake medicines, pesticides, brands, or chemicals.
+- NEVER give exact dosage/chemical amounts unless very certain.
+- If uncertain, say it may need local agricultural inspection.
+- Never reveal internal reasoning or thinking steps.
+"""
+
+
+def generate_image_diagnosis(image_base64: str, caption: str = "", farmer: dict = None) -> str:
+    """
+    Sends a farmer's photo to a vision-capable model on OpenRouter
+    for crop/pest/disease diagnosis.
+
+    NOTE: The main text model (openai/gpt-oss-120b:free) is TEXT-ONLY
+    and cannot process images. This function uses a separate
+    vision-capable model just for image messages — the text model
+    used everywhere else in this file is untouched.
+
+    image_base64: raw base64 string WITHOUT the "data:image/...;base64," prefix
+    caption: optional text the farmer sent along with the photo
+    """
+    user_text = caption.strip() if caption else "આ ફોટોમાં શું સમસ્યા છે? કૃપા કરીને જણાવો."
+
+    farmer_line = ""
+    if farmer:
+        village = farmer.get("village") or ""
+        taluka  = farmer.get("taluka") or ""
+        if village or taluka:
+            farmer_line = f"\n(ખેડૂતનું સ્થળ: {village} {taluka})"
+
+    try:
+        response = client.chat.completions.create(
+            model="google/gemini-2.0-flash-exp:free",
+            messages=[
+                {"role": "system", "content": VISION_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text + farmer_line},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.3,
+            max_tokens=400,
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        print(f"⚠️  Vision model error: {e}")
+        # Safe fallback — never crash the webhook over a vision failure
+        return (
+            "ફોટો જોવામાં તકલીફ પડી 😔\n\n"
+            "કૃપા કરીને સમસ્યા ટેક્સ્ટમાં લખીને જણાવો — "
+            "દા.ત. 'પાન પીળા થઈ ગયા' અથવા 'જીવડાં દેખાય છે'."
+        )
+
+
+def transcribe_audio(audio_bytes: bytes) -> str | None:
+    """
+    Transcribes a farmer's voice note to text using Groq's Whisper API.
+
+    This function was being CALLED from app.py (transcribe_audio(audio_bytes))
+    in the original codebase but was never defined or imported anywhere —
+    every voice note would have crashed with NameError at runtime. Implemented
+    here using Groq (already present in requirements.txt and your stated
+    stack), keeping all model-calling code together in ai_service.py.
+
+    Returns the transcribed text, or None if transcription fails — app.py
+    already handles the None case by telling the farmer to type instead.
+    """
+    try:
+        # Groq's SDK expects a file-like object with a name attribute
+        # so it can infer the format; WhatsApp voice notes are .ogg/opus.
+        import io
+        audio_file = io.BytesIO(audio_bytes)
+        audio_file.name = "voice_note.ogg"
+
+        transcription = groq_client.audio.transcriptions.create(
+            file=audio_file,
+            model="whisper-large-v3",
+            language="gu",   # Gujarati — improves accuracy over auto-detect
+            response_format="text",
+        )
+
+        # Groq SDK returns either a string or an object with .text
+        # depending on response_format; handle both defensively.
+        text = transcription if isinstance(transcription, str) else getattr(transcription, "text", "")
+        text = text.strip()
+
+        return text if text else None
+
+    except Exception as e:
+        print(f"⚠️  Transcription error: {e}")
+        return None
+
+
 def generate_ai_response(user_message: str, history: list = None, farmer: dict = None, weather: dict = None) -> str:
     # Get relevant knowledge from PDF
     try:
@@ -206,8 +217,8 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     response = client.chat.completions.create(
         model="openai/gpt-oss-120b:free",
         messages=messages,
-        temperature=0.2,
-        max_tokens=300,
+        temperature=0.3,
+        max_tokens=500,
     )
 
     return response.choices[0].message.content.strip()
