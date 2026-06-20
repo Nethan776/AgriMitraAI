@@ -21,6 +21,7 @@ from services.whatsapp_service import (
 from services.memory_service import (
     get_or_create_farmer,
     get_recent_messages,
+    update_farmer_details,
     save_message,
     update_last_active,
     is_duplicate_message,
@@ -98,6 +99,25 @@ async def openwa_webhook(request: Request):
         # Must load farmer first so deduplication is scoped per farmer.
         # Two different farmers can have the same message ID.
         farmer, is_new = get_or_create_farmer(phone)
+
+        # Save farmer name from OpenWA contact info
+
+        contact = payload.get("data", {}).get("contact", {})
+
+        farmer_name = (
+            contact.get("pushName")
+            or contact.get("name")
+        )
+        if farmer_name and farmer.get("name") != farmer_name:
+            update_farmer_details(
+                farmer["id"],
+                {
+                    "name": farmer_name
+                }
+            )
+            farmer["name"] = farmer_name
+            print(f"✅ Saved farmer name: {farmer_name}")
+
         update_last_active(farmer["id"])
 
         # ── DEDUPLICATION (per farmer) ────────────────────────────────────
