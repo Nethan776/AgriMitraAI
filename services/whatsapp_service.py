@@ -256,10 +256,7 @@ async def download_whatsapp_media(media_payload: dict) -> bytes | None:
         async with httpx.AsyncClient(timeout=30) as client:
             try:
                 # Try with API key header first (OpenWA's own storage)
-                print("DOWNLOAD PAYLOAD:", media_payload)
                 resp = await client.get(media_url, headers={"X-API-Key": OPENWA_API_KEY})
-                print("ATTEMPTING DOWNLOAD:", media_url)
-                print("STATUS:", resp.status_code)
                 if resp.status_code == 200:
                     return resp.content
 

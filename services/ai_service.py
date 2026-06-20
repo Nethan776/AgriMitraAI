@@ -124,7 +124,7 @@ def generate_image_diagnosis(image_base64: str, caption: str = "", farmer: dict 
 
     try:
         response = client.chat.completions.create(
-            model="google/gemini-2.0-flash-exp:free",
+            model="qwen/qwen2.5-vl-72b-instruct:free",
             messages=[
                 {"role": "system", "content": VISION_SYSTEM_PROMPT},
                 {

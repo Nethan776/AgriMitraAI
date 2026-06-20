@@ -151,7 +151,6 @@ async def openwa_webhook(request: Request):
                 return {"status": "ok"}
 
             print("📷 Downloading image for diagnosis...")
-            print("MEDIA OBJECT:", media)
             image_base64 = await download_whatsapp_media_base64(media)
 
             if not image_base64:
