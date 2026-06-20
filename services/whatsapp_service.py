@@ -236,7 +236,10 @@ async def download_whatsapp_media(media_payload: dict) -> bytes | None:
         return None
 
     # Case 1: base64 already inline — no download needed
-    b64 = media_payload.get("base64")
+    b64 = (
+    media_payload.get("base64")
+    or media_payload.get("data")
+)
     if b64:
         # Strip data URI prefix if present, e.g. "data:image/jpeg;base64,..."
         if "," in b64 and b64.strip().startswith("data:"):
@@ -272,31 +275,26 @@ async def download_whatsapp_media(media_payload: dict) -> bytes | None:
     return None
 
 
-async def download_whatsapp_media_base64(media_payload: dict) -> str | None:
-    """
-    Same as download_whatsapp_media(), but returns a base64-encoded
-    string instead of raw bytes — used for sending images to vision
-    models over OpenRouter's image_url (data URI) format.
-
-    If the payload already contains base64, this short-circuits
-    straight to it instead of decode-then-re-encode.
-    """
-    print("MEDIA PAYLOAD RECEIVED:", media_payload)
-    b64 = media_payload.get("base64")
-    print("HAS BASE64:", bool(b64))
-    media_url = media_payload.get("url")
-    print("MEDIA URL:", media_url)
+async def download_whatsapp_media_base64(
+    media_payload: dict
+) -> str | None:
 
     if not media_payload:
         return None
-    
-    b64 = media_payload.get("base64")
+
+    b64 = (
+        media_payload.get("base64")
+        or media_payload.get("data")
+    )
+
     if b64:
         if "," in b64 and b64.strip().startswith("data:"):
             b64 = b64.split(",", 1)[1]
+
         return b64
 
     raw = await download_whatsapp_media(media_payload)
+
     if raw is None:
         return None
 
