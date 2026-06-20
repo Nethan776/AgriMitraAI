@@ -140,7 +140,9 @@ async def send_whatsapp_reply(phone: str, message: str, session_id: str = None):
     async with httpx.AsyncClient(timeout=30) as client:
         try:
             response = await client.post(url, json=payload, headers=_HEADERS)
-            if response.status_code == 200:
+            # OpenWA returns 201 Created on successful send (it's creating
+            # a new message resource), not 200 — both are success codes.
+            if response.status_code in (200, 201):
                 print(f"✅ Reply sent to {phone}")
             else:
                 print(f"❌ OpenWA send failed [{response.status_code}]: {response.text}")
