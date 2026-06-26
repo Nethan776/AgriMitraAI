@@ -37,10 +37,9 @@ load_dotenv()
 app = FastAPI()
 
 # ─────────────────────────────────────────────
-# Welcome message
-# Sent when the farmer says hi / hello / નમસ્તે etc.
-# Uses the farmer's name (if available) and explains
-# AgriMitra's capabilities.
+# Welcome message — sent when farmer says hi/hello
+# Scraps onboarding entirely. Farmer goes straight
+# to AI flow on every message including the first.
 # ─────────────────────────────────────────────
 
 def get_welcome_message(farmer_name: str | None = None) -> str:
@@ -101,7 +100,7 @@ GREETING_WORDS = {
 }
 
 
-def _is_greeting(text: str) -> bool:
+def _is_greeting(text: str)  -> bool :
     """
     Returns True if the incoming message
     is simply a greeting/help request.
@@ -196,27 +195,16 @@ async def openwa_webhook(request: Request):
         # asked something alongside the greeting.
         # Exception: if it's ONLY a greeting with nothing else, we stop
         # after sending the welcome (no point running AI on "hi").
-        if _is_greeting(text):
+        if _is_greeting(text) and len(text.split()) <= 3:
+            save_message(farmer["id"], "user",      text, whatsapp_message_id=message_id)
             welcome = get_welcome_message(farmer.get("name"))
-
-        save_message(
-            farmer["id"],
-            "user",
-            text,
-            whatsapp_message_id=message_id
-        )
-
-        save_message(
-            farmer["id"],
-            "assistant",
-            welcome
-        )
-
-        await send_whatsapp_reply(
-            phone,
-            welcome,
-            session_id=session_id
-        )
+            save_message(farmer["id"], "assistant", welcome)
+            await send_whatsapp_reply(
+                phone,
+                welcome,
+                session_id=session_id
+)
+            return {"status": "ok"}
 
         # ── IMAGE — vision model diagnosis ────────────────────────────────
         if msg_type == "image":
