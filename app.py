@@ -37,47 +37,89 @@ load_dotenv()
 app = FastAPI()
 
 # ─────────────────────────────────────────────
-# Welcome message — sent when farmer says hi/hello
-# Scraps onboarding entirely. Farmer goes straight
-# to AI flow on every message including the first.
+# Welcome message
+# Sent when the farmer says hi / hello / નમસ્તે etc.
+# Uses the farmer's name (if available) and explains
+# AgriMitra's capabilities.
 # ─────────────────────────────────────────────
 
-WELCOME_MESSAGE = """🌾 *કૃષિ મિત્રમાં આપનું સ્વાગત છે!*
+def get_welcome_message(farmer_name: str | None = None) -> str:
+    """
+    Returns a personalized welcome message.
+    """
 
-હું AgriMitra — તમારો AI ખેતી સહાયક. ૨૪/૭ ઉપલબ્ધ, ગુજરાતીમાં જ વાત કરીએ. 🙏
+    if farmer_name:
+        greeting = f"🌾 *નમસ્તે {farmer_name}!* 👋\n\n"
+    else:
+        greeting = "🌾 *નમસ્તે!* 👋\n\n"
 
-*આ રીતે મદદ લઈ શકો:*
-📷 *ફોટો મોકલો* — પાકની સમસ્યા, જીવાત, રોગ તરત ઓળખાશે
-🎤 *અવાજ સંદેશ* — બોલો, હું સાંભળીશ અને સમજીશ
-💬 *ટાઇપ કરો* — કોઈ પણ ખેતી સવાલ, ગમે ત્યારે
-🌤️ *હવામાન* — "આજ હવામાન" અથવા "weather" લખો
-🌿 *ખાતર / દવા* — યોગ્ય સલાહ અને માત્રા
+    return (
+        greeting +
 
-*કઈ ખેતી સમસ્યા છે? અત્યારે જ પૂછો! 👇*"""
+        "કૃષિ મિત્રમાં આપનું સ્વાગત છે. 🙏\n\n"
+
+        "હું *AgriMitra* — તમારો ડિજિટલ ખેતી સહાયક.\n"
+        "ગુજરાતીમાં 24×7 ખેતી સંબંધિત માર્ગદર્શન આપવા માટે તૈયાર છું.\n\n"
+
+        "📌 *હું તમને આ બાબતોમાં મદદ કરી શકું છું:*\n\n"
+
+        "📷 પાક, પાન, જીવાત અથવા રોગનો ફોટો\n"
+        "🎤 અવાજમાં પૂછેલા પ્રશ્નો\n"
+        "💬 કોઈપણ ખેતી સંબંધિત પ્રશ્ન\n"
+        "🌦️ આજનું હવામાન અને વરસાદની માહિતી\n"
+        "🌿 ખાતર અથવા દવાના પેકેટનો ફોટો\n"
+        "🚁 ડ્રોન સ્પ્રે સંબંધિત માર્ગદર્શન\n\n"
+
+        "💡 *જેટલી વધુ માહિતી અથવા સ્પષ્ટ ફોટો મોકલશો,"
+        " તેટલી વધુ ચોક્કસ સલાહ આપી શકીશ.*\n\n"
+
+        "👇 હવે તમારો પ્રશ્ન મોકલો."
+    )
+
 
 # Words that trigger the welcome message
-# Keeps it simple — only clear greeting words
 GREETING_WORDS = {
-    "hi", "hello", "hey", "helo", "hii", "hiii",
-    "નમસ્તે", "નમસ્કાર", "જય", "જય શ્રી કૃષ્ણ",
-    "kem cho", "કેમ છો", "કેમ", "start", "શરૂ",
-    "help", "મદદ", "info", "શું કરો", "શું",
+    "hi",
+    "hello",
+    "hey",
+    "helo",
+    "hii",
+    "hiii",
+    "namaste",
+    "નમસ્તે",
+    "નમસ્કાર",
+    "જય",
+    "જય શ્રી કૃષ્ણ",
+    "kem cho",
+    "કેમ છો",
+    "કેમ",
+    "start",
+    "શરૂ",
+    "help",
+    "મદદ",
+    "info",
 }
 
 
 def _is_greeting(text: str) -> bool:
-    """Returns True if the message is clearly a greeting or help request."""
+    """
+    Returns True if the incoming message
+    is simply a greeting/help request.
+    """
     if not text:
         return False
+
     cleaned = text.strip().lower()
-    # Exact match
+
     if cleaned in GREETING_WORDS:
         return True
-    # Short message (≤3 words) that starts with a greeting word
+
     words = cleaned.split()
-    if len(words) <= 3 and words[0] in GREETING_WORDS:
-        return True
-    return False
+
+    return (
+        len(words) <= 3
+        and words[0] in GREETING_WORDS
+    )
 
 
 # ─────────────────────────────────────────────
@@ -155,10 +197,26 @@ async def openwa_webhook(request: Request):
         # Exception: if it's ONLY a greeting with nothing else, we stop
         # after sending the welcome (no point running AI on "hi").
         if _is_greeting(text):
-            save_message(farmer["id"], "user",      text, whatsapp_message_id=message_id)
-            save_message(farmer["id"], "assistant", WELCOME_MESSAGE)
-            await send_whatsapp_reply(phone, WELCOME_MESSAGE, session_id=session_id)
-            return {"status": "ok"}
+            welcome = get_welcome_message(farmer.get("name"))
+
+        save_message(
+            farmer["id"],
+            "user",
+            text,
+            whatsapp_message_id=message_id
+        )
+
+        save_message(
+            farmer["id"],
+            "assistant",
+            welcome
+        )
+
+        await send_whatsapp_reply(
+            phone,
+            welcome,
+            session_id=session_id
+        )
 
         # ── IMAGE — vision model diagnosis ────────────────────────────────
         if msg_type == "image":
