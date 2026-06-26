@@ -357,7 +357,13 @@ def format_weather_for_farmer(weather: dict) -> str:
 
 WEATHER_TRIGGERS = [
     "હવામાન", "weather",
-    "temperature", "તાપમાન","humidity", "ભેજ", "આગાહી", "forecast",
+    "વરસાદ", "rain", "ઠંડી", "ગરમી",
+    "temperature", "તાપમાન",
+    "વાદળ", "cloud", "ધુમ્મસ", "fog",
+    "પવન", "wind",
+    "humidity", "ભેજ",
+    "આગાહી", "forecast",
+    "આજ કેવ", "વાતાવ", "તડકો",
 ]
 
 
