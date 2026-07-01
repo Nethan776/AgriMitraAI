@@ -123,7 +123,7 @@ def generate_image_diagnosis(image_base64: str, caption: str = "", farmer: dict 
 
     try:
         response = client.chat.completions.create(
-            model="gpt-5-mini",
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": VISION_SYSTEM_PROMPT},
                 {
@@ -214,12 +214,9 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-    model="gpt-5-mini",
+    model="gpt-4.1-mini",
     messages=messages,
-    reasoning={
-        "effort": "low"
-    },
-    max_completion_tokens=1200,
+    max_tokens=1000,
 )
 
     message = response.choices[0].message.content
