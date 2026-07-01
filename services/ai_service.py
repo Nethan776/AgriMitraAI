@@ -219,4 +219,11 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     max_completion_tokens=500,
 )
 
-    return response.choices[0].message.content.strip()
+    message = response.choices[0].message.content
+
+    print("MESSAGE:", repr(message))
+
+    if not message:
+        return "માફ કરશો, અત્યારે જવાબ તૈયાર કરવામાં તકલીફ પડી. કૃપા કરીને ફરી પ્રયાસ કરો."
+
+    return message.strip()
