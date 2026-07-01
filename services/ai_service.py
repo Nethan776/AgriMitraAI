@@ -216,7 +216,10 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     response = client.chat.completions.create(
     model="gpt-5-mini",
     messages=messages,
-    max_completion_tokens=500,
+    reasoning={
+        "effort": "low"
+    },
+    max_completion_tokens=1200,
 )
 
     message = response.choices[0].message.content
