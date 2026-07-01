@@ -104,7 +104,7 @@ def generate_image_diagnosis(image_base64: str, caption: str = "", farmer: dict 
     Sends a farmer's photo to a vision-capable model on OpenRouter
     for crop/pest/disease diagnosis.
 
-    NOTE: The main text model (openai/gpt-oss-120b:free) is TEXT-ONLY
+    NOTE: The main text model ("gpt-5-mini") is TEXT-ONLY
     and cannot process images. This function uses a separate
     vision-capable model just for image messages — the text model
     used everywhere else in this file is untouched.
@@ -123,7 +123,7 @@ def generate_image_diagnosis(image_base64: str, caption: str = "", farmer: dict 
 
     try:
         response = client.chat.completions.create(
-            model="google/gemini-2.0-flash-exp:free",
+            model="gpt-5-mini",
             messages=[
                 {"role": "system", "content": VISION_SYSTEM_PROMPT},
                 {
@@ -214,7 +214,7 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b:free",
+        model="gpt-5-mini",
         messages=messages,
         temperature=0.3,
         max_tokens=500,
