@@ -222,6 +222,9 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     message = response.choices[0].message.content
 
     print("MESSAGE:", repr(message))
+    print(response.usage)
+    print(response.choices[0].finish_reason)
+    print(repr(response.choices[0].message.content))
 
     if not message:
         return "માફ કરશો, અત્યારે જવાબ તૈયાર કરવામાં તકલીફ પડી. કૃપા કરીને ફરી પ્રયાસ કરો."
