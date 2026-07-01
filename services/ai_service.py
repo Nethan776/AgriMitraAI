@@ -214,10 +214,10 @@ def generate_ai_response(user_message: str, history: list = None, farmer: dict =
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
-        messages=messages,
-        temperature=0.3,
-        max_tokens=500,
-    )
+    model="gpt-5-mini",
+    messages=messages,
+    temperature=0.3,
+    max_completion_tokens=500,
+)
 
     return response.choices[0].message.content.strip()
