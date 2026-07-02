@@ -1,0 +1,254 @@
+{
+  "chunks": [
+    {
+      "id": "cotton_jassid_attack",
+      "crop": "cotton",
+      "problem_type": "pest_attack",
+      "priority": 1,
+      "confidence": "high",
+
+      "symptom_keywords_english": [
+        "yellow leaf edges",
+        "leaf curling",
+        "hopper burn",
+        "dry leaf edges",
+        "stunted growth"
+      ],
+
+      "symptom_keywords_gujarati": [
+        "પાનની ધાર પીળી પડે",
+        "પાન વાંકડા થાય",
+        "પાન સૂકાઈ જાય",
+        "છોડની વૃદ્ધિ ધીમી થાય"
+      ],
+
+      "visible_symptoms": [
+        "પાન નીચે તરફ વળે",
+        "પાન પહેલા પીળા પછી ભૂરા થાય",
+        "પાન સૂકાઈને પડી જાય",
+        "નાના છોડ નબળા પડે"
+      ],
+
+      "likely_causes": [
+        "jassid infestation"
+      ],
+
+      "verification_questions": [
+        "શું પાનની નીચે નાના લીલા જીવાત દેખાય છે?",
+        "શું પાનની ધાર પહેલા પીળી પછી ભૂરા થાય છે?"
+      ],
+
+      "recommended_actions": [
+        "પાનની નીચે જીવાત તપાસો",
+        "ખેતરમાં જીવાતનું પ્રમાણ નિરીક્ષણ કરો",
+        "જરૂર હોય તો સ્થાનિક કૃષિ નિષ્ણાતની સલાહ લો"
+      ],
+
+      "avoid": [
+        "અજાણી દવા છાંટવી",
+        "જરૂર વગર ભારે કીટનાશક વાપરવું"
+      ],
+
+      "source": "ICAR Cotton IPM Guide"
+    },
+
+    {
+      "id": "cotton_whitefly_attack",
+      "crop": "cotton",
+      "problem_type": "pest_attack",
+      "priority": 1,
+      "confidence": "high",
+
+      "symptom_keywords_english": [
+        "sticky leaves",
+        "upward leaf curling",
+        "sooty mold",
+        "white insects"
+      ],
+
+      "symptom_keywords_gujarati": [
+        "પાન ચીકણા થાય",
+        "પાન ઉપર વળે",
+        "સફેદ જીવાત દેખાય",
+        "કાળો ફૂગ દેખાય"
+      ],
+
+      "visible_symptoms": [
+        "પાન પર મધ જેવી ચીકાશ",
+        "કાળો ફૂગ દેખાય",
+        "છોડની તાકાત ઘટે"
+      ],
+
+      "likely_causes": [
+        "whitefly infestation"
+      ],
+
+      "verification_questions": [
+        "શું પાનની નીચે નાના સફેદ જીવાત દેખાય છે?",
+        "શું પાન પર ચીકાશ અથવા કાળો ફૂગ છે?"
+      ],
+
+      "recommended_actions": [
+        "પાનની નીચે જીવાત તપાસો",
+        "ખેતરમાં સફાઈ રાખો",
+        "અતિશય નાઇટ્રોજન ખાતર ટાળો"
+      ],
+
+      "avoid": [
+        "જરૂર વગર વારંવાર સ્પ્રે કરવું"
+      ],
+
+      "source": "ICAR Cotton IPM Guide"
+    },
+
+    {
+      "id": "cotton_leaf_reddening",
+      "crop": "cotton",
+      "problem_type": "physiological_disorder",
+      "priority": 1,
+      "confidence": "medium",
+
+      "symptom_keywords_english": [
+        "red leaves",
+        "yellow leaf margins",
+        "premature leaf drop",
+        "boll development stopped"
+      ],
+
+      "symptom_keywords_gujarati": [
+        "પાન લાલ થાય",
+        "પાનની ધાર પીળી પડે",
+        "પાન સમય પહેલા પડી જાય",
+        "બોલ વિકાસ અટકે"
+      ],
+
+      "visible_symptoms": [
+        "પહેલા પાનની ધાર પીળી પડે",
+        "પછી લાલ રંગ દેખાય",
+        "પાન સૂકાઈ પડે"
+      ],
+
+      "likely_causes": [
+        "nitrogen deficiency",
+        "potassium deficiency",
+        "moisture stress",
+        "leaf hopper infestation",
+        "zinc deficiency"
+      ],
+
+      "verification_questions": [
+        "શું ખેતરમાં પાણીની અછત છે?",
+        "શું જાસીડ જીવાત પણ દેખાય છે?"
+      ],
+
+      "recommended_actions": [
+        "સંતુલિત ખાતર વ્યવસ્થા રાખો",
+        "નિયમિત સિંચાઈ કરો",
+        "જમીન પરીક્ષણ કરાવો"
+      ],
+
+      "avoid": [
+        "અતિશય યુરિયા ઉપયોગ",
+        "અજાણી દવા છાંટવી"
+      ],
+
+      "source": "ICAR Cotton IPM Guide"
+    },
+
+    {
+      "id": "cotton_bacterial_blight",
+      "crop": "cotton",
+      "problem_type": "disease",
+      "priority": 2,
+      "confidence": "high",
+
+      "symptom_keywords_english": [
+        "angular leaf spots",
+        "water soaked spots",
+        "black stem lesions"
+      ],
+
+      "symptom_keywords_gujarati": [
+        "પાન પર ખૂણાવાળા ડાઘ",
+        "પાન પર પાણી જેવા ડાઘ",
+        "ડાંડી કાળી પડે"
+      ],
+
+      "visible_symptoms": [
+        "પાન પર ભૂરા અથવા કાળા ડાઘ",
+        "ડાંડી પર કાળા પટ્ટા",
+        "નાના છોડ સુકાઈ જાય"
+      ],
+
+      "likely_causes": [
+        "bacterial blight infection"
+      ],
+
+      "verification_questions": [
+        "શું ડાઘ ખૂણાવાળા દેખાય છે?",
+        "શું ડાંડી પર કાળા નિશાન છે?"
+      ],
+
+      "recommended_actions": [
+        "સંક્રમિત પાન દૂર કરો",
+        "ખેતરમાં હવાના પ્રવાહને સુધારો",
+        "જરૂર હોય તો કૃષિ નિષ્ણાતની સલાહ લો"
+      ],
+
+      "avoid": [
+        "ભીંજાયેલા પાન પર કામ કરવું"
+      ],
+
+      "source": "ICAR Cotton IPM Guide"
+    },
+
+    {
+      "id": "cotton_root_rot",
+      "crop": "cotton",
+      "problem_type": "disease",
+      "priority": 2,
+      "confidence": "high",
+
+      "symptom_keywords_english": [
+        "sudden wilting",
+        "root decay",
+        "drying plants",
+        "black roots"
+      ],
+
+      "symptom_keywords_gujarati": [
+        "છોડ અચાનક સુકાય",
+        "મૂળ કાળા પડે",
+        "છોડ ઢળી જાય"
+      ],
+
+      "visible_symptoms": [
+        "છોડ સરળતાથી જમીનમાંથી નીકળી જાય",
+        "મૂળ સડી જાય",
+        "પાંદડા સૂકાઈ જાય"
+      ],
+
+      "likely_causes": [
+        "root rot disease",
+        "poor drainage"
+      ],
+
+      "verification_questions": [
+        "શું મૂળ કાળા અથવા સડેલા દેખાય છે?",
+        "શું ખેતરમાં પાણી ભરાય છે?"
+      ],
+
+      "recommended_actions": [
+        "ડ્રેનેજ સુધારો",
+        "અતિશય સિંચાઈ ટાળો",
+        "સંક્રમિત છોડ દૂર કરો"
+      ],
+
+      "avoid": [
+        "પાણી ભરાઈ રહેવા દેવું"
+      ],
+
+      "source": "ICAR Cotton IPM Guide"
+    }
+  ]
+}
